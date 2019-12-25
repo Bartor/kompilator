@@ -1,3 +1,4 @@
 BEGIN
-    x ASSIGN 1;
+    kotek ASSIGN 1;
+    piesek ASSIGN kotek;
 END

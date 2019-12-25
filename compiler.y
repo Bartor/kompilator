@@ -11,36 +11,42 @@
 %}
 
 %union {
-    int numVal;
-    std::string stringVal;
+    int token;
+
+    int numberValue;
+    std::string *stringValue;
 }
 
-%token DECLARE BEGIN END ASSIGN IF THEN ELSE ENDIF
-%token WHILE DO ENDDO ENDWHILE FOR FROM TO DOWNTO ENDFOR
-%token READ WRITE
-%token PLUS MINUS TIMES DIV MOD
-%token EQ NEQ LE GE LEQ GEQ
-%token RBRACKET LBRACKET COLON SEMICOLON COMA
+%token <token> DECLARE T_BEGIN END ASSIGN IF THEN ELSE ENDIF
+%token <token> WHILE DO ENDDO ENDWHILE FOR FROM TO DOWNTO ENDFOR
+%token <token> READ WRITE
+%token <token> PLUS MINUS TIMES DIV MOD
+%token <token> EQ NEQ LE GE LEQ GEQ
+%token <token> RBRACKET LBRACKET COLON SEMICOLON COMMA
+%token <token> ERROR
 
-%token <numVal> NUMBER
-%token <stringVal> PIDENTIFIER
+%token <numberValue> NUMBER
+%token <stringValue> PIDENTIFIER
 
 %%
 program:
-    DECLARE declarations BEGIN commands END
-    | BEGIN commands END
+    DECLARE declarations T_BEGIN commands END
+    | T_BEGIN commands END
 ;
 
 declarations:
-    declarations COMA PIDENTIFIER
-    | declarations COMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
+    declarations COMMA PIDENTIFIER
+    | declarations COMMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
     | PIDENTIFIER
     | PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
 ;
 
 commands:
-    commands command
-    | command
+    commands command {
+        std::cout << "Found a command" << std::endl;
+    } | command {
+        std::cout << "Found a command" << std::endl;
+    }
 ;
 
 command:
@@ -74,12 +80,15 @@ condition:
 ;
 
 value:
-    NUMBER
-    | identifier
+    NUMBER {
+        std::cout << "Number value: " << $1 << std::endl;
+    } | identifier
 ;
 
 identifier:
-    PIDENTIFIER
+    PIDENTIFIER {
+        std::cout << "identifier: " << *$1 << std::endl;
+    }
     | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET
     | PIDENTIFIER LBRACKET NUMBER RBRACKET
 ;

@@ -1,0 +1,12 @@
+# ignore extensionless files aka generated binary
+*
+!*/
+!*.*
+
+# ignore ide files
+cmake-build-debug/
+
+# ignore build files
+*.l.c
+*.tab.c
+*.tab.h

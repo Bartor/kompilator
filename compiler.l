@@ -1,11 +1,11 @@
 %option noyywrap
 %option yylineno
-%option c++
 
 %{
     #include <string>
-    #include "compiler.tab.hpp"
-    int yylex();
+    #include "compiler.tab.h"
+
+    #define TOKEN(t) (yylval.token = t)
 %}
 
 pidentifier [_a-z]+
@@ -14,44 +14,45 @@ comment \[.*\]
 
 %%
 \n              ;
+\r              ;
 [[:blank:]]+    ;
 {comment}       ;
-DECLARE         { return DECLARE; }
-BEGIN           { return BEGIN; }
-END             { return END; }
-ASSIGN          { return ASSIGN; }
-IF              { return IF; }
-THEN            { return THEN; }
-ELSE            { return ELSE; }
-ENDIF           { return ENDIF; }
-WHILE           { return WHILE; }
-DO              { return DO; }
-ENDDO           { return ENDDO; }
-ENDWHILE        { return ENDWHILE; }
-FOR             { return FOR; }
-FROM            { return FROM; }
-TO              { return TO; }
-DOWNTO          { return DOWNTO; }
-ENDFOR          { return ENDFOR; }
-READ            { return READ; }
-WRITE           { return WRITE; }
-PLUS            { return PLUS; }
-MINUS           { return MINUS; }
-TIMES           { return TIMES; }
-DIV             { return DIV; }
-MOD             { return MOD; }
-EQ              { return EQ; }
-NEQ             { return NEQ; }
-LE              { return LE; }
-GE              { return GE; }
-LEQ             { return LEQ; }
-GEQ             { return GEQ; }
-{pidentifier}   { yylval.stringVal = new std::string(yytext); return PIDENTIFIER; }
-{number}        { yylval.numVal = atoi(yytext); return NUMBER; }
-\(              { return LBRACKET; }
-\)              { return RBRACKET; }
-\:              { return COLON; }
-\;              { return SEMICOLON; }
-\,              { return COMMA; }
-.               { return ERROR; }
+{pidentifier}   { yylval.stringValue = new std::string(yytext, yyleng); return PIDENTIFIER; }
+{number}        { yylval.numberValue = atoi(yytext); return NUMBER; }
+DECLARE         { return TOKEN(DECLARE); }
+BEGIN           { return TOKEN(T_BEGIN); }
+END             { return TOKEN(END); }
+ASSIGN          { return TOKEN(ASSIGN); }
+IF              { return TOKEN(IF); }
+THEN            { return TOKEN(THEN); }
+ELSE            { return TOKEN(ELSE); }
+ENDIF           { return TOKEN(ENDIF); }
+WHILE           { return TOKEN(WHILE); }
+DO              { return TOKEN(DO); }
+ENDDO           { return TOKEN(ENDDO); }
+ENDWHILE        { return TOKEN(ENDWHILE); }
+FOR             { return TOKEN(FOR); }
+FROM            { return TOKEN(FROM); }
+TO              { return TOKEN(TO); }
+DOWNTO          { return TOKEN(DOWNTO); }
+ENDFOR          { return TOKEN(ENDFOR); }
+READ            { return TOKEN(READ); }
+WRITE           { return TOKEN(WRITE); }
+PLUS            { return TOKEN(PLUS); }
+MINUS           { return TOKEN(MINUS); }
+TIMES           { return TOKEN(TIMES); }
+DIV             { return TOKEN(DIV); }
+MOD             { return TOKEN(MOD); }
+EQ              { return TOKEN(EQ); }
+NEQ             { return TOKEN(NEQ); }
+LE              { return TOKEN(LE); }
+GE              { return TOKEN(GE); }
+LEQ             { return TOKEN(LEQ); }
+GEQ             { return TOKEN(GEQ); }
+\(              { return TOKEN(LBRACKET); }
+\)              { return TOKEN(RBRACKET); }
+\:              { return TOKEN(COLON); }
+\;              { return TOKEN(SEMICOLON); }
+\,              { return TOKEN(COMMA); }
+.               { return TOKEN(ERROR); }
 %%
