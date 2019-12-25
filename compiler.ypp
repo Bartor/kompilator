@@ -1,0 +1,107 @@
+%{
+    #include <iostream>
+    #include <cstdio>
+    #include <string>
+
+    extern int yylex();
+    extern int yyparse();
+    extern FILE *yyin;
+
+    void yyerror(const char *s);
+%}
+
+%union {
+    int numVal;
+    std::string stringVal;
+}
+
+%token DECLARE BEGIN END ASSIGN IF THEN ELSE ENDIF
+%token WHILE DO ENDDO ENDWHILE FOR FROM TO DOWNTO ENDFOR
+%token READ WRITE
+%token PLUS MINUS TIMES DIV MOD
+%token EQ NEQ LE GE LEQ GEQ
+%token RBRACKET LBRACKET COLON SEMICOLON COMA
+
+%token <numVal> NUMBER
+%token <stringVal> PIDENTIFIER
+
+%%
+program:
+    DECLARE declarations BEGIN commands END
+    | BEGIN commands END
+;
+
+declarations:
+    declarations COMA PIDENTIFIER
+    | declarations COMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
+    | PIDENTIFIER
+    | PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
+;
+
+commands:
+    commands command
+    | command
+;
+
+command:
+    identifier ASSIGN expression SEMICOLON
+    | IF condition THEN commands ELSE commands ENDIF
+    | IF condition THEN commands ENDIF
+    | WHILE condition DO commands ENDWHILE
+    | DO commands WHILE condition ENDDO
+    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR
+    | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR
+    | READ identifier COLON
+    | WRITE value COLON
+;
+
+expression:
+    value
+    | value PLUS value
+    | value MINUS value
+    | value TIMES value
+    | value DIV value
+    | value MOD value
+;
+
+condition:
+    value EQ value
+    | value NEQ value
+    | value LE value
+    | value GE value
+    | value LEQ value
+    | value GEQ value
+;
+
+value:
+    NUMBER
+    | identifier
+;
+
+identifier:
+    PIDENTIFIER
+    | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET
+    | PIDENTIFIER LBRACKET NUMBER RBRACKET
+;
+%%
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        std::cerr << "No source file specified" << std::endl;
+        return 1;
+    }
+
+    FILE *source = fopen(argv[1], "r");
+    if (!source) {
+        std::cerr << "Can't open " << argv[1] << std::endl;
+        return 1;
+    }
+
+    yyin = source;
+    yyparse();
+}
+
+void yyerror(const char *s) {
+  std::cout << "Parsing error: " << s << std::endl;
+  exit(1);
+}
