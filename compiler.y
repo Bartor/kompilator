@@ -10,8 +10,16 @@
     void yyerror(const char *s);
 %}
 
+%code requires {
+    #include "ast/node.h"
+}
+
 %union {
     int token;
+
+    Command *cmd;
+    Identifier *ident;
+    Expression *exp;
 
     int numberValue;
     std::string *stringValue;
@@ -24,6 +32,11 @@
 %token <token> EQ NEQ LE GE LEQ GEQ
 %token <token> RBRACKET LBRACKET COLON SEMICOLON COMMA
 %token <token> ERROR
+
+%type <cmd> command
+%type <ident> identifier;
+%type <numberValue> value;
+%type <exp> expression;
 
 %token <numberValue> NUMBER
 %token <stringValue> PIDENTIFIER
@@ -42,15 +55,15 @@ declarations:
 ;
 
 commands:
-    commands command {
-        std::cout << "Found a command" << std::endl;
-    } | command {
-        std::cout << "Found a command" << std::endl;
-    }
+    commands command
+    | command
 ;
 
 command:
-    identifier ASSIGN expression SEMICOLON
+    identifier ASSIGN expression SEMICOLON {
+        std::cout << "new assign" << std::endl;
+        $$ = new Assignment(*$1, *$3);
+    }
     | IF condition THEN commands ELSE commands ENDIF
     | IF condition THEN commands ENDIF
     | WHILE condition DO commands ENDWHILE
@@ -62,7 +75,10 @@ command:
 ;
 
 expression:
-    value
+    value {
+        std::cout << "new value" << std::endl;
+        $$ = new ValueExpression(*new Value($1));
+    }
     | value PLUS value
     | value MINUS value
     | value TIMES value
@@ -81,13 +97,13 @@ condition:
 
 value:
     NUMBER {
-        std::cout << "Number value: " << $1 << std::endl;
+        $$ = $1;
     } | identifier
 ;
 
 identifier:
     PIDENTIFIER {
-        std::cout << "identifier: " << *$1 << std::endl;
+        $$ = new Identifier(*$1);
     }
     | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET
     | PIDENTIFIER LBRACKET NUMBER RBRACKET
