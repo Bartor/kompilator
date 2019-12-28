@@ -1,16 +1,13 @@
 #include "node.hpp"
 #include <string>
-#include <iostream>
-#include <typeinfo>
 
 /* ==== toString ==== */
 
 std::string Node::indent(int indentation) {
-    return std::string(indentation, ' ');
+    return std::string(indentation, '|');
 }
 
 std::string VariableIdentifier::toString(int indentation) {
-    std::cout << "var id: " << name << std::endl;
     return indent(indentation) + "Variable<" + name + ">\n";
 }
 
@@ -19,8 +16,7 @@ std::string AccessIdentifier::toString(int indentation) {
 }
 
 std::string VariableAccessIdentifier::toString(int indentation) {
-    return indent(indentation) + "ArrayAccess<" + name + ">[\n" + variableIdentifier.toString(indentation + 1) +
-           indent(indentation) + "\n";
+    return indent(indentation) + "ArrayAccess<" + name + ">[" + accessName + "]\n";
 }
 
 std::string NumberValue::toString(int indentation) {
@@ -37,12 +33,12 @@ std::string UnaryExpression::toString(int indentation) {
 }
 
 std::string BinaryExpression::toString(int indentation) {
-    return indent(indentation) + "BinaryExpression<\n" + lhs.toString(indentation + 1) + "," +
+    return indent(indentation) + "BinaryExpression<\n" + lhs.toString(indentation + 1) +
            rhs.toString(indentation + 1) + indent(indentation) + ">\n";
 }
 
 std::string Condition::toString(int indentation) {
-    return indent(indentation) + "Condition<\n" + lhs.toString(indentation + 1) + "," + rhs.toString(indentation + 1) +
+    return indent(indentation) + "Condition<\n" + lhs.toString(indentation + 1) + rhs.toString(indentation + 1) +
            indent(indentation) + ">\n";
 }
 
@@ -56,34 +52,28 @@ std::string CommandList::toString(int indentation) {
 }
 
 std::string Assignment::toString(int indentation) {
-    std::cout << "[{" << std::endl;
-    std::cout << &identifier << std::endl;
-    std::cout << "Class: " << typeid(identifier).name() << std::endl;
-    std::cout << identifier.toString(0);
-    std::cout << "}]" << std::endl;
-
     return indent(indentation) + "Assignment<\n" + identifier.toString(indentation + 1) +
            expression.toString(indentation + 1) + indent(indentation) + ">\n";
 }
 
 std::string If::toString(int indentation) {
-    return indent(indentation) + "If<\n" + condition.toString(indentation + 1) + "," +
+    return indent(indentation) + "If<\n" + condition.toString(indentation + 1) +
            commands.toString(indentation + 1) + indent(indentation) + ">\n";
 }
 
 std::string IfElse::toString(int indentation) {
-    return indent(indentation) + "If<\n" + condition.toString(indentation + 1) + "," +
+    return indent(indentation) + "If<\n" + condition.toString(indentation + 1) +
            commands.toString(indentation + 1) + "," + elseCommands.toString(indentation + 1) + indent(indentation) +
            ">\n";
 }
 
 std::string While::toString(int indentation) {
-    return indent(indentation) + "While<\n" + condition.toString(indentation + 1) + "," +
-           commands.toString(indentation + 1) + ">\n";
+    return indent(indentation) + "While<\n" + condition.toString(indentation + 1) +
+           commands.toString(indentation + 1) + indent(indentation) + ">\n";
 }
 
 std::string For::toString(int indentation) {
-    return indent(indentation) + "For<" + variableName + "," + startValue.toString(indentation + 1) +
+    return indent(indentation) + "For<" + variableName + ",\n" + startValue.toString(indentation + 1) +
            endValue.toString(indentation + 1) + commands.toString(indentation + 1) + indent(indentation) + ">\n";
 }
 

@@ -61,6 +61,7 @@ public:
  * a[0]
  */
 class AccessIdentifier : public AbstractIdentifier {
+public:
     std::string &name;
     long long index;
 
@@ -73,13 +74,14 @@ class AccessIdentifier : public AbstractIdentifier {
  * a[b]
  */
 class VariableAccessIdentifier : public AbstractIdentifier {
+public:
     std::string &name;
-    VariableIdentifier &variableIdentifier;
+    std::string &accessName;
 
     virtual std::string toString(int indentation);
 
-    VariableAccessIdentifier(std::string &name, VariableIdentifier &variableIdentifier)
-            : name(name), variableIdentifier(variableIdentifier) {}
+    VariableAccessIdentifier(std::string &name, std::string &accessName)
+            : name(name), accessName(accessName) {}
 };
 
 /**
@@ -106,6 +108,7 @@ public:
  * a, a[0], a[b]
  */
 class IdentifierValue : public AbstractValue {
+public:
     AbstractIdentifier &identifier;
 
     virtual std::string toString(int indentation);

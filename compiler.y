@@ -67,7 +67,7 @@ program:
 ;
 
 declarations:
-    declarations COMMA PIDENTIFIER { //todo fix this to return something
+    declarations COMMA PIDENTIFIER {
         $$->declarations.push_back(new IdentifierDeclaration(*$3));
     }
     | declarations COMMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET {
@@ -170,8 +170,7 @@ value:
     NUMBER {
         $$ = new NumberValue($1);
     } | identifier {
-        //todo
-        std::cout << "Look for identifier in variable table" << std::endl;
+        $$ = new IdentifierValue(*$1);
     }
 ;
 
@@ -179,9 +178,12 @@ identifier:
     PIDENTIFIER {
         $$ = new VariableIdentifier(*$1);
     }
-    | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET { //todo
+    | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET {
+        $$ = new VariableAccessIdentifier(*$1, *$3);
     }
-    | PIDENTIFIER LBRACKET NUMBER RBRACKET
+    | PIDENTIFIER LBRACKET NUMBER RBRACKET {
+        $$ = new AccessIdentifier(*$1, $3);
+    }
 ;
 %%
 
@@ -205,7 +207,6 @@ int main(int argc, char **argv) {
 
     Program *program = new Program(*declarations, *commands);
 
-    std::cout << "Done" << std::endl;
     std::cout << program->toString() << std::endl;
 }
 
