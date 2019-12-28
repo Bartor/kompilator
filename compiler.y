@@ -2,6 +2,7 @@
     #include <iostream>
     #include <cstdio>
     #include <string>
+    #include "ast/node.hpp"
 
     extern int yylex();
     extern int yyparse();
@@ -10,6 +11,9 @@
     extern char* yytext;
 
     void yyerror(const char *s);
+
+    DeclarationList *declarations = nullptr;
+    CommandList *commands = nullptr;
 %}
 
 %code requires {
@@ -28,7 +32,7 @@
     DeclarationList *decl_list;
     CommandList *cmd_list;
 
-    int numberValue;
+    long long numberValue;
     std::string *stringValue;
 }
 
@@ -39,6 +43,7 @@
 %token <token> EQ NEQ LE GE LEQ GEQ
 %token <token> RBRACKET LBRACKET COLON SEMICOLON COMMA
 %token <token> ERROR
+
 %token <numberValue> NUMBER
 %token <stringValue> PIDENTIFIER
 
@@ -48,64 +53,124 @@
 %type <cond> condition;
 %type <decl_list> declarations;
 %type <cmd_list> commands;
-%type<numberValue> value;
+%type <value> value;
 
 %%
 program:
-    DECLARE declarations T_BEGIN commands END
-    | T_BEGIN commands END
+    DECLARE declarations T_BEGIN commands END {
+        declarations = $2;
+        commands = $4;
+    }
+    | T_BEGIN commands END {
+        commands = $2;
+    }
 ;
 
 declarations:
-    declarations COMMA PIDENTIFIER
-    | declarations COMMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
-    | PIDENTIFIER
-    | PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET
+    declarations COMMA PIDENTIFIER { //todo fix this to return something
+        $$->declarations.push_back(new IdentifierDeclaration(*$3));
+    }
+    | declarations COMMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET {
+        $$->declarations.push_back(new ArrayDeclaration(*$3, $5, $7));
+    }
+    | PIDENTIFIER {
+        $$ = new DeclarationList();
+        $$->declarations.push_back(new IdentifierDeclaration(*$1));
+    }
+    | PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET {
+        $$ = new DeclarationList();
+        $$->declarations.push_back(new ArrayDeclaration(*$1, $3, $5));
+    }
 ;
 
 commands:
-    commands command
-    | command
+    commands command {
+        $1->commands.push_back($2);
+    }
+    | command {
+        $$ = new CommandList();
+        $$->commands.push_back($1);
+    }
 ;
 
 command:
     identifier ASSIGN expression SEMICOLON {
         $$ = new Assignment(*$1, *$3);
     }
-    | IF condition THEN commands ELSE commands ENDIF
-    | IF condition THEN commands ENDIF
-    | WHILE condition DO commands ENDWHILE
-    | DO commands WHILE condition ENDDO
-    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR
-    | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR
-    | READ identifier SEMICOLON
-    | WRITE value SEMICOLON
+    | IF condition THEN commands ELSE commands ENDIF {
+        $$ = new IfElse(*$2, *$4, *$6);
+    }
+    | IF condition THEN commands ENDIF {
+        $$ = new If(*$2, *$4);
+    }
+    | WHILE condition DO commands ENDWHILE {
+        $$ = new While(*$2, *$4);
+    }
+    | DO commands WHILE condition ENDDO {
+        $$ = new While(*$4, *$2, true);
+    }
+    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR {
+        $$ = new For(*$2, *$4, *$6, *$8);
+    }
+    | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR {
+        $$ = new For(*$2, *$4, *$6, *$8, true);
+    }
+    | READ identifier SEMICOLON {
+        //todo
+        std::cout << "Look for identifier in variable table" << std::endl;
+    }
+    | WRITE value SEMICOLON {
+        $$ = new Write(*$2);
+    }
 ;
 
 expression:
     value {
-        $$ = new UnaryExpression(*new NumberValue($1));
+        $$ = new UnaryExpression(*$1);
     }
-    | value PLUS value
-    | value MINUS value
-    | value TIMES value
-    | value DIV value
-    | value MOD value
+    | value PLUS value {
+        $$ = new BinaryExpression(*$1, *$3, ADDITION);
+    }
+    | value MINUS value {
+        $$ = new BinaryExpression(*$1, *$3, SUBTRACTION);
+    }
+    | value TIMES value {
+        $$ = new BinaryExpression(*$1, *$3, MULTIPLICATION);
+    }
+    | value DIV value {
+        $$ = new BinaryExpression(*$1, *$3, DIVISION);
+    }
+    | value MOD value {
+        $$ = new BinaryExpression(*$1, *$3, MODULO);
+    }
 ;
 
 condition:
-    value EQ value
-    | value NEQ value
-    | value LE value
-    | value GE value
-    | value LEQ value
-    | value GEQ value
+    value EQ value {
+        $$ = new Condition(*$1, *$3, EQUAL);
+    }
+    | value NEQ value {
+        $$ = new Condition(*$1, *$3, NOT_EQUAL);
+    }
+    | value LE value {
+        $$ = new Condition(*$1, *$3, LESS);
+    }
+    | value GE value {
+        $$ = new Condition(*$1, *$3, GREATER);
+    }
+    | value LEQ value {
+        $$ = new Condition(*$1, *$3, LESS_OR_EQUAL);
+    }
+    | value GEQ value {
+        $$ = new Condition(*$1, *$3, GREATER_OR_EQUAL);
+    }
 ;
 
 value:
     NUMBER {
-        $$ = $1;
+        $$ = new NumberValue($1);
     } | identifier {
+        //todo
         std::cout << "Look for identifier in variable table" << std::endl;
     }
 ;
@@ -114,7 +179,8 @@ identifier:
     PIDENTIFIER {
         $$ = new VariableIdentifier(*$1);
     }
-    | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET
+    | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET { //todo
+    }
     | PIDENTIFIER LBRACKET NUMBER RBRACKET
 ;
 %%
@@ -133,9 +199,17 @@ int main(int argc, char **argv) {
 
     yyin = source;
     yyparse();
+
+    if (commands == nullptr) commands = new CommandList();
+    if (declarations == nullptr) declarations = new DeclarationList();
+
+    Program *program = new Program(*declarations, *commands);
+
+    std::cout << "Done" << std::endl;
+    std::cout << program->toString() << std::endl;
 }
 
 void yyerror(const char *s) {
-  std::cout << "Parsing error: " << s << " at line " << yylineno << ": '" << yytext << "'" <<std::endl;
+  std::cout << "PARSING ERROR: " << s << " at line " << yylineno << ": '" << yytext << "'" <<std::endl;
   exit(1);
 }
