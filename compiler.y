@@ -6,20 +6,27 @@
     extern int yylex();
     extern int yyparse();
     extern FILE *yyin;
+    extern int yylineno;
+    extern char* yytext;
 
     void yyerror(const char *s);
 %}
 
 %code requires {
-    #include "ast/node.h"
+    #include "ast/node.hpp"
 }
 
 %union {
     int token;
 
     Command *cmd;
-    Identifier *ident;
-    Expression *exp;
+    AbstractIdentifier *ident;
+    AbstractValue *value;
+    AbstractExpression *exp;
+    Condition *cond;
+    AbstractDeclaration *decl;
+    DeclarationList *decl_list;
+    CommandList *cmd_list;
 
     int numberValue;
     std::string *stringValue;
@@ -32,14 +39,16 @@
 %token <token> EQ NEQ LE GE LEQ GEQ
 %token <token> RBRACKET LBRACKET COLON SEMICOLON COMMA
 %token <token> ERROR
-
-%type <cmd> command
-%type <ident> identifier;
-%type <numberValue> value;
-%type <exp> expression;
-
 %token <numberValue> NUMBER
 %token <stringValue> PIDENTIFIER
+
+%type <cmd> command;
+%type <ident> identifier;
+%type <exp> expression;
+%type <cond> condition;
+%type <decl_list> declarations;
+%type <cmd_list> commands;
+%type<numberValue> value;
 
 %%
 program:
@@ -61,7 +70,6 @@ commands:
 
 command:
     identifier ASSIGN expression SEMICOLON {
-        std::cout << "new assign" << std::endl;
         $$ = new Assignment(*$1, *$3);
     }
     | IF condition THEN commands ELSE commands ENDIF
@@ -70,14 +78,13 @@ command:
     | DO commands WHILE condition ENDDO
     | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR
     | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR
-    | READ identifier COLON
-    | WRITE value COLON
+    | READ identifier SEMICOLON
+    | WRITE value SEMICOLON
 ;
 
 expression:
     value {
-        std::cout << "new value" << std::endl;
-        $$ = new ValueExpression(*new Value($1));
+        $$ = new UnaryExpression(*new NumberValue($1));
     }
     | value PLUS value
     | value MINUS value
@@ -98,12 +105,14 @@ condition:
 value:
     NUMBER {
         $$ = $1;
-    } | identifier
+    } | identifier {
+        std::cout << "Look for identifier in variable table" << std::endl;
+    }
 ;
 
 identifier:
     PIDENTIFIER {
-        $$ = new Identifier(*$1);
+        $$ = new VariableIdentifier(*$1);
     }
     | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET
     | PIDENTIFIER LBRACKET NUMBER RBRACKET
@@ -127,6 +136,6 @@ int main(int argc, char **argv) {
 }
 
 void yyerror(const char *s) {
-  std::cout << "Parsing error: " << s << std::endl;
+  std::cout << "Parsing error: " << s << " at line " << yylineno << ": '" << yytext << "'" <<std::endl;
   exit(1);
 }

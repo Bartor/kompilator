@@ -1,7 +1,7 @@
 .PHONY = all clean cleanall
 
 all: compiler.tab.cpp compiler.l.c
-	g++ -o compiler compiler.tab.c compiler.l.c ast/node.h
+	g++ -o compiler compiler.tab.c compiler.l.c
 
 compiler.tab.cpp: compiler.y
 	bison -d compiler.y

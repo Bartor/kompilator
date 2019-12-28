@@ -4,7 +4,7 @@
 %{
     #include <string>
     #include "compiler.tab.h"
-    #include "ast/node.h"
+    #include "ast/node.hpp"
 
     #define TOKEN(t) (yylval.token = t)
 %}
