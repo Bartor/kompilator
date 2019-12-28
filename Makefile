@@ -10,7 +10,7 @@ compiler.l.c: compiler.l
 	flex -o compiler.l.c compiler.l
 
 clean:
-	rm -f *.tab.c *.tab.hpp *.l.c
+	rm -f compiler.tab.c compiler.tab.h compiler.l.c
 
 cleanall: clean
 	rm -f compiler
