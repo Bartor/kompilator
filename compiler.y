@@ -116,8 +116,7 @@ command:
         $$ = new For(*$2, *$4, *$6, *$8, true);
     }
     | READ identifier SEMICOLON {
-        //todo
-        std::cout << "Look for identifier in variable table" << std::endl;
+        $$ = new Read(*$2);
     }
     | WRITE value SEMICOLON {
         $$ = new Write(*$2);
