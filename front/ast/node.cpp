@@ -1,4 +1,4 @@
-#include "node.hpp"
+#include "node.h"
 #include <string>
 
 /* ==== toString ==== */

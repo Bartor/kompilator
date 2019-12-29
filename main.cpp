@@ -1,5 +1,5 @@
 #include <iostream>
-#include "front/ast/node.hpp"
+#include "front/ast/node.h"
 
 extern DeclarationList *declarations;
 extern CommandList *commands;

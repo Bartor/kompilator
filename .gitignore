@@ -7,6 +7,6 @@
 cmake-build-debug/
 
 # ignore build files
-*.l.c
-*.tab.c
-*.tab.h
+*.l.c*
+*.tab.c*
+*.tab.h*

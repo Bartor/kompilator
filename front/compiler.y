@@ -2,7 +2,7 @@
     #include <iostream>
     #include <cstdio>
     #include <string>
-    #include "ast/node.hpp"
+    #include "ast/node.h"
 
     extern int yylex();
     extern int yyparse();
@@ -17,7 +17,7 @@
 %}
 
 %code requires {
-    #include "ast/node.hpp"
+    #include "ast/node.h"
 }
 
 %union {

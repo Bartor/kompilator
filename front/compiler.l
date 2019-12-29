@@ -3,8 +3,8 @@
 
 %{
     #include <string>
-    #include "compiler.tab.hpp"
-    #include "ast/node.hpp"
+    #include "compiler.tab.h"
+    #include "ast/node.h"
 
     #define TOKEN(t) (yylval.token = t)
 %}
