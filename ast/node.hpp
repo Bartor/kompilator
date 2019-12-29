@@ -2,8 +2,8 @@
  * AST class definitions
  */
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #ifndef COMPILER_NODE_H
 #define COMPILER_NODE_H
@@ -29,7 +29,7 @@ enum ConditionType {
  * Base abstract class for representing anything in AST
  */
 class Node {
-public:
+   public:
     std::string indent(int indentation);
 
     virtual std::string toString(int indentation) = 0;
@@ -41,7 +41,7 @@ public:
  * Base class for VariableIdentifier, AccessIdentifier and VariableAccessIdentifier
  */
 class AbstractIdentifier : public Node {
-public:
+   public:
     virtual ~AbstractIdentifier() {}
 };
 
@@ -49,7 +49,7 @@ public:
  * a
  */
 class VariableIdentifier : public AbstractIdentifier {
-public:
+   public:
     std::string &name;
 
     virtual std::string toString(int indentation);
@@ -61,7 +61,7 @@ public:
  * a[0]
  */
 class AccessIdentifier : public AbstractIdentifier {
-public:
+   public:
     std::string &name;
     long long index;
 
@@ -74,21 +74,21 @@ public:
  * a[b]
  */
 class VariableAccessIdentifier : public AbstractIdentifier {
-public:
+   public:
     std::string &name;
     std::string &accessName;
 
     virtual std::string toString(int indentation);
 
     VariableAccessIdentifier(std::string &name, std::string &accessName)
-            : name(name), accessName(accessName) {}
+        : name(name), accessName(accessName) {}
 };
 
 /**
  * Values are used in iterators, expressions and conditions
  */
 class AbstractValue : public Node {
-public:
+   public:
     virtual ~AbstractValue() {}
 };
 
@@ -96,7 +96,7 @@ public:
  * 5
  */
 class NumberValue : public AbstractValue {
-public:
+   public:
     long long value;
 
     virtual std::string toString(int indentation);
@@ -108,7 +108,7 @@ public:
  * a, a[0], a[b]
  */
 class IdentifierValue : public AbstractValue {
-public:
+   public:
     AbstractIdentifier &identifier;
 
     virtual std::string toString(int indentation);
@@ -120,7 +120,7 @@ public:
  * Basically math
  */
 class AbstractExpression : public Node {
-public:
+   public:
     virtual ~AbstractExpression() {}
 };
 
@@ -128,7 +128,7 @@ public:
  * Basically a Value
  */
 class UnaryExpression : public AbstractExpression {
-public:
+   public:
     AbstractValue &value;
 
     virtual std::string toString(int indentation);
@@ -140,7 +140,7 @@ public:
  * +, -, *, /, %
  */
 class BinaryExpression : public AbstractExpression {
-public:
+   public:
     AbstractValue &lhs;
     AbstractValue &rhs;
     BinaryExpressionType type;
@@ -148,14 +148,14 @@ public:
     virtual std::string toString(int indentation);
 
     BinaryExpression(AbstractValue &lhs, AbstractValue &rhs, BinaryExpressionType type)
-            : lhs(lhs), rhs(rhs), type(type) {}
+        : lhs(lhs), rhs(rhs), type(type) {}
 };
 
 /**
  * >, <, ==, !==, >=, <=
  */
 class Condition : public Node {
-public:
+   public:
     AbstractValue &lhs;
     AbstractValue &rhs;
     ConditionType type;
@@ -163,19 +163,19 @@ public:
     virtual std::string toString(int indentation);
 
     Condition(AbstractValue &lhs, AbstractValue &rhs, ConditionType type)
-            : lhs(lhs), rhs(rhs), type(type) {}
+        : lhs(lhs), rhs(rhs), type(type) {}
 };
 
 /**
  * Base abstract class for data manipulation, looping etc.
  */
 class Command : public Node {
-public:
+   public:
     virtual ~Command() {}
 };
 
 class CommandList : public Node {
-public:
+   public:
     std::vector<Command *> commands;
 
     virtual std::string toString(int indentation);
@@ -184,18 +184,18 @@ public:
 };
 
 class Assignment : public Command {
-public:
+   public:
     AbstractIdentifier &identifier;
     AbstractExpression &expression;
 
     virtual std::string toString(int indentation);
 
     Assignment(AbstractIdentifier &identifier, AbstractExpression &expression)
-            : identifier(identifier), expression(expression) {}
+        : identifier(identifier), expression(expression) {}
 };
 
 class If : public Command {
-public:
+   public:
     Condition &condition;
     CommandList &commands;
 
@@ -205,17 +205,17 @@ public:
 };
 
 class IfElse : public If {
-public:
+   public:
     CommandList &elseCommands;
 
     virtual std::string toString(int indentation);
 
     IfElse(Condition &condition, CommandList &commands, CommandList &elseCommands)
-            : If(condition, commands), elseCommands(elseCommands) {}
+        : If(condition, commands), elseCommands(elseCommands) {}
 };
 
 class While : public Command {
-public:
+   public:
     Condition &condition;
     CommandList &commands;
     bool doWhile;
@@ -223,11 +223,11 @@ public:
     virtual std::string toString(int indentation);
 
     While(Condition &condition, CommandList &commands, bool doWhile = false)
-            : condition(condition), commands(commands), doWhile(doWhile) {}
+        : condition(condition), commands(commands), doWhile(doWhile) {}
 };
 
 class For : public Command {
-public:
+   public:
     std::string variableName;
     AbstractValue &startValue;
     AbstractValue &endValue;
@@ -239,12 +239,11 @@ public:
     For(std::string &variableName, AbstractValue &startValue, AbstractValue &endValue,
         CommandList &commands,
         bool reversed = false)
-            : variableName(variableName), startValue(startValue), endValue(endValue), commands(commands),
-              reversed(reversed) {}
+        : variableName(variableName), startValue(startValue), endValue(endValue), commands(commands), reversed(reversed) {}
 };
 
 class Read : public Command {
-public:
+   public:
     AbstractIdentifier &identifier;
 
     virtual std::string toString(int indentation);
@@ -253,7 +252,7 @@ public:
 };
 
 class Write : public Command {
-public:
+   public:
     AbstractValue &value;
 
     virtual std::string toString(int indentation);
@@ -262,12 +261,12 @@ public:
 };
 
 class AbstractDeclaration : public Node {
-public:
+   public:
     virtual ~AbstractDeclaration() {}
 };
 
 class IdentifierDeclaration : public AbstractDeclaration {
-public:
+   public:
     std::string &name;
 
     virtual std::string toString(int indentation);
@@ -276,7 +275,7 @@ public:
 };
 
 class ArrayDeclaration : public AbstractDeclaration {
-public:
+   public:
     std::string &name;
     long long start;
     long long end;
@@ -287,7 +286,7 @@ public:
 };
 
 class DeclarationList : public Node {
-public:
+   public:
     std::vector<AbstractDeclaration *> declarations;
 
     virtual std::string toString(int indentation);
@@ -296,14 +295,14 @@ public:
 };
 
 class Program {
-public:
+   public:
     DeclarationList &declarations;
     CommandList &commands;
 
     Program(DeclarationList &declarationList, CommandList &commandList)
-            : declarations(declarationList), commands(commandList) {}
+        : declarations(declarationList), commands(commandList) {}
 
     std::string toString();
 };
 
-#endif //COMPILER_NODE_H
+#endif  //COMPILER_NODE_H
