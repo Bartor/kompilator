@@ -6,6 +6,8 @@
       <w>enddo</w>
       <w>endfor</w>
       <w>pidentifier</w>
+      <w>scopedvariables</w>
+      <w>staticanalyzer</w>
     </words>
   </dictionary>
 </component>
