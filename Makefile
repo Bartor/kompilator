@@ -1,16 +1,16 @@
 .PHONY = all clean cleanall
 
 all: compiler.tab.cpp compiler.l.c
-	g++ -std=c++11 -o compiler compiler.tab.c compiler.l.c ast/node.cpp
+	g++ -std=c++11 -o compiler front/compiler.tab.cpp front/compiler.l.c front/ast/node.cpp main.cpp
 
-compiler.tab.cpp: compiler.y
-	bison -d compiler.y
+compiler.tab.cpp: front/compiler.y
+	bison -d -o front/compiler.tab.cpp front/compiler.y
 
-compiler.l.c: compiler.l
-	flex -o compiler.l.c compiler.l
+compiler.l.c: front/compiler.l
+	flex -o front/compiler.l.c front/compiler.l
 
 clean:
-	rm -f compiler.tab.c compiler.tab.h compiler.l.c
+	rm -f front/compiler.tab.cpp front/compiler.tab.hpp front/compiler.l.c
 
 cleanall: clean
 	rm -f compiler
