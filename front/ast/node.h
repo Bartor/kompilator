@@ -295,13 +295,19 @@ public:
     DeclarationList() {}
 };
 
+class ConstantList {
+public:
+    std::vector<long long> constants;
+};
+
 class Program {
 public:
     DeclarationList &declarations;
     CommandList &commands;
+    ConstantList &constants;
 
-    Program(DeclarationList &declarationList, CommandList &commandList)
-            : declarations(declarationList), commands(commandList) {}
+    Program(DeclarationList &declarationList, CommandList &commandList, ConstantList &constantList)
+            : declarations(declarationList), commands(commandList), constants(constantList) {}
 
     std::string toString();
 };

@@ -2,6 +2,7 @@
     #include <iostream>
     #include <cstdio>
     #include <string>
+    #include <vector>
     #include "ast/node.h"
 
     extern int yylex();
@@ -14,6 +15,7 @@
 
     DeclarationList *declarations = nullptr;
     CommandList *commands = nullptr;
+    ConstantList *constants = new ConstantList();
 %}
 
 %code requires {
@@ -167,6 +169,7 @@ condition:
 
 value:
     NUMBER {
+        constants->constants.push_back($1);
         $$ = new NumberValue($1);
     } | identifier {
         $$ = new IdentifierValue(*$1);

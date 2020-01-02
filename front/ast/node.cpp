@@ -102,7 +102,7 @@ std::string ArrayDeclaration::toString(int indentation) {
 }
 
 std::string Program::toString() {
-    return "Program<\n" + declarations.toString(0) + "\n" + commands.toString(0) + ">";
+    return "Program<\n" + declarations.toString(0) + "\n" + commands.toString(0) + ">\nConstants: " + std::to_string(constants.constants.size());
 }
 
 /* ==== end of toString ==== */

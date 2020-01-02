@@ -1,9 +1,13 @@
 #include <iostream>
 #include "front/ast/node.h"
+#include "middle/abstract_assembler/AbstractAssembler.h"
 
 extern DeclarationList *declarations;
 extern CommandList *commands;
+extern ConstantList *constants;
+
 extern int yyparse();
+
 extern FILE *yyin;
 
 int main(int argc, char **argv) {
@@ -24,7 +28,11 @@ int main(int argc, char **argv) {
     if (commands == nullptr) commands = new CommandList();
     if (declarations == nullptr) declarations = new DeclarationList();
 
-    Program *program = new Program(*declarations, *commands);
+    Program *program = new Program(*declarations, *commands, *constants);
 
     std::cout << program->toString() << std::endl;
+
+    AbstractAssembler *analyzer = new AbstractAssembler(*program);
+//    analyzer->assemble();
+    return 0;
 }

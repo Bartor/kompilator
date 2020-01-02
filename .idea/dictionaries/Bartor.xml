@@ -1,11 +1,13 @@
 <component name="ProjectDictionaryState">
   <dictionary name="Bartor">
     <words>
+      <w>abstractassembler</w>
       <w>bartor</w>
       <w>downto</w>
       <w>enddo</w>
       <w>endfor</w>
       <w>pidentifier</w>
+      <w>resolvableaddress</w>
       <w>scopedvariables</w>
       <w>staticanalyzer</w>
     </words>
