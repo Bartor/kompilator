@@ -1,6 +1,8 @@
 #include "ResolvableAddress.h"
 #include "../../back/asm/asm.h"
 
+#include <string>
+
 #ifndef COMPILER_CONSTANT_H
 #define COMPILER_CONSTANT_H
 
@@ -10,7 +12,12 @@ private:
 public:
     long long value;
 
+    ResolvableAddress &getAddress();
+
     InstructionList &generateConstant();
+
+    std::string toString();
+
     Constant(long long value, ResolvableAddress &address) : value(value), address(address) {}
 };
 

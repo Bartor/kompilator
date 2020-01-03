@@ -8,12 +8,15 @@
 class Instruction {
 public:
     virtual std::string toAssemblyCode(bool pretty = false) = 0;
+
     virtual ~Instruction() {}
 };
 
 class InstructionList {
 public:
     std::vector<Instruction *> instructions;
+
+    InstructionList &append(InstructionList &list);
 };
 
 class Get : public Instruction {

@@ -1,0 +1,7 @@
+DECLARE
+    i
+BEGIN
+    READ i;
+    WRITE i;
+    WRITE 5;
+END

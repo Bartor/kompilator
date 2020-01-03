@@ -13,14 +13,17 @@ class AbstractAssembler {
 private:
     Program &program;
     ScopedVariables &scopedVariables = *new ScopedVariables();
-    Constants &constants = *new Constants();
+    Constants &constants = *new Constants(2);
 
     void getVariablesFromDeclarations();
-    void getConstants();
+
+    InstructionList &assembleConstants();
 
     InstructionList &assembleCommands(CommandList &commandList);
 
     InstructionList &assembleCondition(Condition &condition);
+
+    ResolvableAddress &resolveValue(AbstractValue &value);
 
 public:
     AbstractAssembler(Program &program) : program(program) {}

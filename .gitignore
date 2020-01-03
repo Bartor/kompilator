@@ -6,6 +6,9 @@
 # ignore ide files
 cmake-build-debug/
 
+# ignore vm files
+vm/
+
 # ignore build files
 *.l.c*
 *.tab.c*

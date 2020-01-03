@@ -8,7 +8,7 @@ private:
     std::vector<Constant *> constants;
     long long currentAddress;
 public:
-    void addConstant(long long value);
+    Constant *addConstant(long long value);
 
     Constant *getConstant(long long value);
 

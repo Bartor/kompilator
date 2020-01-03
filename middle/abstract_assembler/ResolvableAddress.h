@@ -7,7 +7,7 @@ private:
     long long address;
     bool offset;
 public:
-    ResolvableAddress(long long startingAddress = 0) : address(address), offset(false) {}
+    ResolvableAddress(long long startingAddress = 0) : address(startingAddress), offset(false) {}
 
     long long getAddress();
 

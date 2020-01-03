@@ -12,3 +12,11 @@ InstructionList &Constant::generateConstant() {
 
     return instructions;
 }
+
+ResolvableAddress &Constant::getAddress() {
+    return address;
+}
+
+std::string Constant::toString() {
+    return "Constant<" + std::to_string(value) + ">";
+}

@@ -15,6 +15,8 @@ public:
 
     ResolvableAddress &getAddress();
 
+    virtual std::string toString() = 0;
+
     Variable(std::string &name, ResolvableAddress &address, bool readOnly = false)
             : name(name), address(address), readOnly(readOnly) {}
 
@@ -27,6 +29,8 @@ public:
             : Variable(name, address, readOnly) {
         size = 1;
     }
+
+    virtual std::string toString();
 };
 
 class NumberArrayVariable : public Variable {
@@ -39,6 +43,8 @@ public:
             : Variable(name, address, readOnly), start(start), end(end) {
         size = end - start + 1;
     }
+
+    virtual std::string toString();
 };
 
 #endif //COMPILER_VARIABLES_H

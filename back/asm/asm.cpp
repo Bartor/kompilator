@@ -1,5 +1,10 @@
 #include "asm.h"
 
+InstructionList &InstructionList::append(InstructionList &list) {
+    instructions.insert(instructions.end(), list.instructions.begin(), list.instructions.end());
+    return *this;
+}
+
 std::string Get::toAssemblyCode(bool pretty) {
     return "GET";
 }

@@ -22,17 +22,32 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    std::cout << "- Parsing -" << std::endl;
+
     yyin = source;
     yyparse();
+
+    std::cout << "Done" << std::endl;
 
     if (commands == nullptr) commands = new CommandList();
     if (declarations == nullptr) declarations = new DeclarationList();
 
     Program *program = new Program(*declarations, *commands, *constants);
 
+    std::cout << "-=- A S T -=-" << std::endl;
     std::cout << program->toString() << std::endl;
 
-    AbstractAssembler *analyzer = new AbstractAssembler(*program);
-//    analyzer->assemble();
+    AbstractAssembler *assembler = new AbstractAssembler(*program);
+
+    std::cout << std::endl << "- Assembling -" << std::endl;
+
+    InstructionList &assembled = assembler->assemble();
+
+    std::cout << std::endl << "-=- A S M -=-" << std::endl;
+
+    for (const auto &ins : assembled.instructions) {
+        std::cout << ins->toAssemblyCode(true) << std::endl;
+    }
+
     return 0;
 }
