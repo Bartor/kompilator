@@ -19,3 +19,7 @@ Constant *Constants::getConstant(long long value) {
     }
     return nullptr;
 }
+
+long long Constants::size() {
+    return constants.size();
+}

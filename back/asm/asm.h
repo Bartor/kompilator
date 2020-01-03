@@ -17,6 +17,8 @@ public:
     std::vector<Instruction *> instructions;
 
     InstructionList &append(InstructionList &list);
+
+    InstructionList &append(Instruction *instruction);
 };
 
 class Get : public Instruction {

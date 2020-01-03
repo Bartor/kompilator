@@ -12,6 +12,8 @@ public:
 
     Constant *getConstant(long long value);
 
+    long long size();
+
     Constants(long long startAddress = 2) : currentAddress(startAddress) {}
 };
 

@@ -5,6 +5,11 @@ InstructionList &InstructionList::append(InstructionList &list) {
     return *this;
 }
 
+InstructionList &InstructionList::append(Instruction *instruction) {
+    instructions.push_back(instruction);
+    return *this;
+}
+
 std::string Get::toAssemblyCode(bool pretty) {
     return "GET";
 }

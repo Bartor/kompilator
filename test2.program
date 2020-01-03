@@ -2,6 +2,6 @@ DECLARE
     i
 BEGIN
     READ i;
+    i ASSIGN i PLUS 2;
     WRITE i;
-    WRITE 5;
 END
