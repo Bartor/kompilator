@@ -20,6 +20,6 @@ Constant *Constants::getConstant(long long value) {
     return nullptr;
 }
 
-long long Constants::size() {
-    return constants.size();
+long long Constants::lastAddress() {
+    return currentAddress + 1;
 }

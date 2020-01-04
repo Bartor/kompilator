@@ -6,19 +6,39 @@
 #define COMPILER_ASM_H
 
 class Instruction {
+protected:
+    long long address = -1;
 public:
+    bool stub = false;
+
+    virtual void setAddress(long long newAddress);
+
+    virtual long long getAddress();
+
     virtual std::string toAssemblyCode(bool pretty = false) = 0;
 
     virtual ~Instruction() {}
 };
 
-class InstructionList {
+class Stub : public Instruction {
+private:
+    Stub *target;
+    std::vector<Stub *> redirections;
 public:
-    std::vector<Instruction *> instructions;
+    virtual std::string toAssemblyCode(bool pretty = false);
 
-    InstructionList &append(InstructionList &list);
+    void redirect(Stub *newTarget);
 
-    InstructionList &append(Instruction *instruction);
+    void setAddress(long long newAddress);
+
+    long long getAddress();
+
+    void registerRedirection(Stub *newRedirection);
+
+    Stub() {
+        target = this;
+        stub = true;
+    }
 };
 
 class Get : public Instruction {
@@ -111,38 +131,32 @@ public:
 
 class Jump : public Instruction {
 public:
-    ResolvableAddress &address;
+    Instruction *target;
 
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Jump(ResolvableAddress &address) : address(address) {}
+    Jump(Instruction *target) : target(target) {}
 };
 
-class Jpos : public Instruction {
+class Jpos : public Jump {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Jpos(ResolvableAddress &address) : address(address) {}
+    Jpos(Instruction *target) : Jump(target) {}
 };
 
-class Jzero : public Instruction {
+class Jzero : public Jump {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Jzero(ResolvableAddress &address) : address(address) {}
+    Jzero(Instruction *target) : Jump(target) {}
 };
 
-class Jneg : public Instruction {
+class Jneg : public Jump {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Jneg(ResolvableAddress &address) : address(address) {}
+    Jneg(Instruction *target) : Jump(target) {}
 };
 
 #endif //COMPILER_ASM_H

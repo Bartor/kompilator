@@ -1,13 +1,39 @@
 #include "asm.h"
 
-InstructionList &InstructionList::append(InstructionList &list) {
-    instructions.insert(instructions.end(), list.instructions.begin(), list.instructions.end());
-    return *this;
+void Instruction::setAddress(long long newAddress) {
+    address = newAddress;
 }
 
-InstructionList &InstructionList::append(Instruction *instruction) {
-    instructions.push_back(instruction);
-    return *this;
+long long Instruction::getAddress() {
+    return address;
+}
+
+std::string Stub::toAssemblyCode(bool pretty) {
+    return "ERROR - stub instructions should NEVER be compiled!";
+}
+
+void Stub::redirect(Stub *newTarget) {
+    target = newTarget;
+    newTarget->registerRedirection(this);
+
+    for (const auto &s : redirections) {
+        s->redirect(newTarget);
+    }
+}
+
+void Stub::registerRedirection(Stub *newRedirection) {
+    redirections.push_back(newRedirection);
+}
+
+long long Stub::getAddress() {
+    if (target == this) {
+        return address;
+    }
+    return target->getAddress();
+}
+
+void Stub::setAddress(long long newAddress) {
+    address = newAddress;
 }
 
 std::string Get::toAssemblyCode(bool pretty) {
@@ -59,17 +85,17 @@ std::string Shift::toAssemblyCode(bool pretty) {
 }
 
 std::string Jump::toAssemblyCode(bool pretty) {
-    return "JUMP" + std::string(pretty ? " " : "") + std::to_string(address.getAddress());
+    return "JUMP" + std::string(pretty ? " " : "") + std::to_string(target->getAddress());
 }
 
 std::string Jpos::toAssemblyCode(bool pretty) {
-    return "JPOS" + std::string(pretty ? " " : "") + std::to_string(address.getAddress());
+    return "JPOS" + std::string(pretty ? " " : "") + std::to_string(target->getAddress());
 }
 
 std::string Jzero::toAssemblyCode(bool pretty) {
-    return "JZERO" + std::string(pretty ? " " : "") + std::to_string(address.getAddress());
+    return "JZERO" + std::string(pretty ? " " : "") + std::to_string(target->getAddress());
 }
 
 std::string Jneg::toAssemblyCode(bool pretty) {
-    return "JNEG" + std::string(pretty ? " " : "") + std::to_string(address.getAddress());
+    return "JNEG" + std::string(pretty ? " " : "") + std::to_string(target->getAddress());
 }

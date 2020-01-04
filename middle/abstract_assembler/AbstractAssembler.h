@@ -1,5 +1,6 @@
 #include "../../front/ast/node.h"
 #include "../../back/asm/asm.h"
+#include "../../back/asm/InstructionList.h"
 #include "ScopedVariables.h"
 #include "Constants.h"
 #include <vector>
@@ -43,7 +44,7 @@ private:
 
     InstructionList &assembleCommands(CommandList &commandList);
 
-    InstructionList &assembleCondition(Condition &condition);
+    InstructionList &assembleCondition(Condition &condition, InstructionList &codeBlock);
 
     ResolvableAddress &resolveValue(AbstractValue &value);
 

@@ -20,7 +20,7 @@ InstructionList &AbstractAssembler::assembleConstants() {
 }
 
 void AbstractAssembler::getVariablesFromDeclarations() {
-    scopedVariables = new ScopedVariables(constants->size());
+    scopedVariables = new ScopedVariables(constants->lastAddress());
 
     for (const auto &declaration : program.declarations.declarations) {
         if (auto numDecl = dynamic_cast<IdentifierDeclaration *>(declaration)) {
@@ -74,16 +74,73 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
             Store *store = new Store(variableAddress);
             instructions.append(store);
         } else if (auto ifNode = dynamic_cast<If *>(command)) { // IF
-            InstructionList codeBlock = assembleCommands(ifNode->commands);
+            InstructionList codeBlock = assembleCommands(ifNode->commands); // assemble inner instructions
+            InstructionList &conditionBlock = assembleCondition(ifNode->condition, codeBlock); // assemble condition
+
+            instructions.append(conditionBlock) // add condition code
+                    .append(codeBlock); // add inner block code
         }
     }
 
     return instructions;
 }
 
-
-InstructionList &AbstractAssembler::assembleCondition(Condition &condition) {
+InstructionList &AbstractAssembler::assembleCondition(Condition &condition, InstructionList &codeBlock) {
     InstructionList &instructions = *new InstructionList();
+
+    ResolvableAddress &lhsAddress = resolveValue(condition.lhs);
+    ResolvableAddress &rhsAddress = resolveValue(condition.rhs);
+
+    Load *load = new Load(lhsAddress);
+    Sub *sub = new Sub(rhsAddress);
+
+    instructions.append(load)
+            .append(sub);
+
+    switch (condition.type) {
+        case EQUAL: {
+            Jzero *jzero = new Jzero(codeBlock.end()); // jump to end of code block if they don't subtruct to zero
+
+            instructions.append(jzero);
+        }
+            break;
+        case NOT_EQUAL: {
+            Jzero *jzero = new Jzero(codeBlock.start()); // jump to start of code block if the subtract to zero
+            Jump *jump = new Jump(codeBlock.end()); // otherwise, jump to its end
+
+            instructions.append(jzero)
+                    .append(jump);
+        }
+            break;
+        case LESS: {
+            Jzero *jzero = new Jzero(codeBlock.end()); // jump if it's zero
+            Jpos *jpos = new Jpos(codeBlock.end()); // jump to end if a - b < 0 => a < b
+
+            instructions.append(jzero)
+                    .append(jpos);
+        }
+            break;
+        case GREATER: {
+            Jzero *jzero = new Jzero(codeBlock.end()); // jump if it's zero
+            Jneg *jneg = new Jneg(codeBlock.end()); // jump to end if a - b > 0 => a > b
+
+            instructions.append(jzero)
+                    .append(jneg);
+        }
+            break;
+        case LESS_OR_EQUAL: {
+            Jpos *jpos = new Jpos(codeBlock.end()); // jump to end if a - b < 0 => a < b
+
+            instructions.append(jpos);
+        }
+            break;
+        case GREATER_OR_EQUAL: {
+            Jneg *jneg = new Jneg(codeBlock.end()); // jump to end if a - b > 0 => a > b
+
+            instructions.append(jneg);
+        }
+            break;
+    }
 
     return instructions;
 }
@@ -146,9 +203,9 @@ ResolvableAddress &AbstractAssembler::resolveValue(AbstractValue &value) {
 }
 
 InstructionList &AbstractAssembler::assemble() {
-    InstructionList &constantsInstructions = assembleConstants();
+    InstructionList &instructions = assembleConstants();
     getVariablesFromDeclarations();
-    constantsInstructions.append(assembleCommands(program.commands));
-    constantsInstructions.append(new Halt());
-    return constantsInstructions;
+    instructions.append(assembleCommands(program.commands));
+    instructions.seal();
+    return instructions;
 }

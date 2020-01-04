@@ -2,6 +2,7 @@ DECLARE
     i
 BEGIN
     READ i;
-    i ASSIGN i PLUS 2;
-    WRITE i;
+    IF i LEQ 10 THEN
+        WRITE 1;
+    ENDIF
 END

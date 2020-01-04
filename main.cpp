@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include "front/ast/node.h"
 #include "middle/abstract_assembler/AbstractAssembler.h"
 
@@ -11,8 +12,8 @@ extern int yyparse();
 extern FILE *yyin;
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        std::cerr << "No source file specified" << std::endl;
+    if (argc != 2 && argc != 3) {
+        std::cerr << "Usage: compiler <source> [destination]" << std::endl;
         return 1;
     }
 
@@ -45,9 +46,15 @@ int main(int argc, char **argv) {
 
     std::cout << std::endl << "-=- A S M -=-" << std::endl;
 
-    for (const auto &ins : assembled.instructions) {
-        std::cout << ins->toAssemblyCode(true) << std::endl;
+    std::ofstream output;
+    output.open(argv[2] ? argv[2] : "a.out");
+    for (const auto &ins : assembled.getInstructions()) {
+        if (!ins->stub) {
+            std::cout << ins->toAssemblyCode(true) << std::endl;
+            output << ins->toAssemblyCode(true) << std::endl;
+        }
     }
+    output.close();
 
     return 0;
 }
