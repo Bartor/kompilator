@@ -62,7 +62,7 @@ std::string If::toString(int indentation) {
 }
 
 std::string IfElse::toString(int indentation) {
-    return indent(indentation) + "If<\n" + condition.toString(indentation + 1) +
+    return indent(indentation) + "IfElse<\n" + condition.toString(indentation + 1) +
            commands.toString(indentation + 1) + "," + elseCommands.toString(indentation + 1) + indent(indentation) +
            ">\n";
 }

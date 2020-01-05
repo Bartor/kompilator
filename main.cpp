@@ -50,10 +50,11 @@ int main(int argc, char **argv) {
     output.open(argv[2] ? argv[2] : "a.out");
     for (const auto &ins : assembled.getInstructions()) {
         if (!ins->stub) {
-            std::cout << ins->toAssemblyCode(true) << std::endl;
+            std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
             output << ins->toAssemblyCode(true) << std::endl;
         }
     }
+
     output.close();
 
     return 0;

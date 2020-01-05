@@ -204,14 +204,16 @@ public:
     If(Condition &condition, CommandList &commands) : condition(condition), commands(commands) {}
 };
 
-class IfElse : public If {
+class IfElse : public Command {
 public:
+    Condition &condition;
+    CommandList &commands;
     CommandList &elseCommands;
 
     virtual std::string toString(int indentation);
 
     IfElse(Condition &condition, CommandList &commands, CommandList &elseCommands)
-            : If(condition, commands), elseCommands(elseCommands) {}
+            : condition(condition), commands(commands), elseCommands(elseCommands) {}
 };
 
 class While : public Command {

@@ -1,0 +1,12 @@
+DECLARE
+    i
+BEGIN
+    DO
+        READ i;
+        IF i GE 0 THEN
+            WRITE 1;
+        ELSE
+            WRITE 0;
+        ENDIF
+    WHILE i NEQ 0 ENDDO
+END

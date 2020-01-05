@@ -79,6 +79,37 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
 
             instructions.append(conditionBlock) // add condition code
                     .append(codeBlock); // add inner block code
+        } else if (auto ifElseNode = dynamic_cast<IfElse *>(command)) { // IF ELSE
+            InstructionList ifCodeBlock = assembleCommands(ifElseNode->commands);
+            InstructionList &conditionBlock = assembleCondition(ifElseNode->condition, ifCodeBlock);
+            InstructionList elseCodeBlock = assembleCommands(ifElseNode->elseCommands);
+
+            Jump *jump = new Jump(elseCodeBlock.end());
+            ifCodeBlock.append(jump);
+
+            instructions.append(conditionBlock)
+                    .append(ifCodeBlock)
+                    .append(elseCodeBlock);
+        } else if (auto whileNode = dynamic_cast<While *>(command)) { // WHILE
+            InstructionList codeBlock = assembleCommands(whileNode->commands);
+
+            if (whileNode->doWhile) {
+                InstructionList *jumpBlock = new InstructionList();
+                Jump *jump = new Jump(codeBlock.start());
+                jumpBlock->append(jump);
+
+                InstructionList &conditionBlock = assembleCondition(whileNode->condition, *jumpBlock);
+                instructions.append(codeBlock)
+                        .append(conditionBlock)
+                        .append(*jumpBlock);
+            } else {
+                InstructionList &conditionBlock = assembleCondition(whileNode->condition, codeBlock);
+                Jump *jump = new Jump(conditionBlock.start());
+                codeBlock.append(jump);
+
+                instructions.append(conditionBlock)
+                        .append(codeBlock);
+            }
         }
     }
 
@@ -98,13 +129,13 @@ InstructionList &AbstractAssembler::assembleCondition(Condition &condition, Inst
             .append(sub);
 
     switch (condition.type) {
-        case EQUAL: {
+        case NOT_EQUAL: {
             Jzero *jzero = new Jzero(codeBlock.end()); // jump to end of code block if they don't subtruct to zero
 
             instructions.append(jzero);
         }
             break;
-        case NOT_EQUAL: {
+        case EQUAL: {
             Jzero *jzero = new Jzero(codeBlock.start()); // jump to start of code block if the subtract to zero
             Jump *jump = new Jump(codeBlock.end()); // otherwise, jump to its end
 

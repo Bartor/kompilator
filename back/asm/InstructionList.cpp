@@ -18,7 +18,7 @@ Instruction *InstructionList::start() {
 }
 
 InstructionList &InstructionList::append(InstructionList &list) {
-    end()->redirect(list.end());
+//    end()->redirect(list.end()); // this seemed to be a good idea but suddenly wasn't
     instructions.insert(instructions.end() - 1, list.instructions.begin(),
                         list.instructions.end());
     return *this;

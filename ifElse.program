@@ -2,7 +2,7 @@ DECLARE
     i
 BEGIN
     READ i;
-    IF i LEQ 10 THEN
-        WRITE 1;
+    IF i GE 5 THEN
+        WRITE 5;
     ENDIF
 END
