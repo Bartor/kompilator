@@ -2,6 +2,8 @@
 
 InstructionList::InstructionList() {
     afterLast = new Stub();
+    first = new Stub();
+    instructions.push_back(first);
     instructions.push_back(afterLast); // last element stub
 }
 
@@ -14,7 +16,7 @@ Stub *InstructionList::end() {
 }
 
 Instruction *InstructionList::start() {
-    return instructions.front();
+    return first;
 }
 
 InstructionList &InstructionList::append(InstructionList &list) {

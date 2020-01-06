@@ -73,6 +73,7 @@ declarations:
         $$->declarations.push_back(new IdentifierDeclaration(*$3));
     }
     | declarations COMMA PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET {
+        constants->constants.push_back($5);
         $$->declarations.push_back(new ArrayDeclaration(*$3, $5, $7));
     }
     | PIDENTIFIER {
@@ -81,6 +82,7 @@ declarations:
     }
     | PIDENTIFIER LBRACKET NUMBER COLON NUMBER RBRACKET {
         $$ = new DeclarationList();
+        constants->constants.push_back($3);
         $$->declarations.push_back(new ArrayDeclaration(*$1, $3, $5));
     }
 ;
@@ -184,6 +186,7 @@ identifier:
         $$ = new VariableAccessIdentifier(*$1, *$3);
     }
     | PIDENTIFIER LBRACKET NUMBER RBRACKET {
+        constants->constants.push_back($3);
         $$ = new AccessIdentifier(*$1, $3);
     }
 ;

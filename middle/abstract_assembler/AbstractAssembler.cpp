@@ -1,7 +1,9 @@
 #include "AbstractAssembler.h"
 
+std::string TEMPORARY_NAMES = "TEMP";
+
 InstructionList &AbstractAssembler::assembleConstants() {
-    constants = new Constants(2);
+    constants = new Constants(accumulatorNumber);
 
     InstructionList &list = *new InstructionList();
 
@@ -9,8 +11,7 @@ InstructionList &AbstractAssembler::assembleConstants() {
         Constant *constantAddress = constants->addConstant(num);
 
         if (constantAddress) {
-            std::cout << constantAddress->toString() + " at 0x" << std::setbase(16)
-                      << constantAddress->getAddress().getAddress() << std::endl;
+            std::cout << constantAddress->toString() + " at " << constantAddress->getAddress().getAddress() << std::endl;
 
             list.append(constantAddress->generateConstant());
         }
@@ -20,19 +21,27 @@ InstructionList &AbstractAssembler::assembleConstants() {
 }
 
 void AbstractAssembler::getVariablesFromDeclarations() {
-    scopedVariables = new ScopedVariables(constants->lastAddress());
+    scopedVariables = new ScopedVariables(
+            accumulatorNumber // offset by accumulators...
+            + program.constants.constants.size() // ...constants...
+            + program.declarations.declarations.size() // ...and possible constants
+    );
 
     for (const auto &declaration : program.declarations.declarations) {
         if (auto numDecl = dynamic_cast<IdentifierDeclaration *>(declaration)) {
             NumberVariable *var = new NumberVariable(numDecl->name, *new ResolvableAddress());
             scopedVariables->pushVariableScope(var);
-            std::cout << var->toString() << " at 0x" << std::setbase(16)
-                      << var->getAddress().getAddress() << std::endl;
+            std::cout << var->toString() << " at " << var->getAddress().getAddress() << std::endl;
         } else if (auto arrDecl = dynamic_cast<ArrayDeclaration *>(declaration)) {
-            NumberArrayVariable *var = new NumberArrayVariable(arrDecl->name, *new ResolvableAddress(), arrDecl->start,
-                                                               arrDecl->end);
+            NumberArrayVariable *var = new NumberArrayVariable(arrDecl->name, *new ResolvableAddress(), arrDecl->start, arrDecl->end);
             scopedVariables->pushVariableScope(var);
-            std::cout << var->toString() << " at 0x" << std::setbase(16) << var->getAddress().getAddress() << std::endl;
+            std::cout << var->toString() << " at " << var->getAddress().getAddress() << std::endl;
+
+            // this is an array start address; it must be included in generated constants to use with indirect
+            // variable addressing mode (e.g. a[b])
+            // constants are to be generated in the next step, based on program constants
+            // this isn't the best solutions and should be changed one day
+            program.constants.constants.push_back(var->getAddress().getAddress());
         }
     }
 }
@@ -49,30 +58,32 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
 
     for (const auto &command : commandList.commands) {
         if (auto readNode = dynamic_cast<Read *>(command)) { // READ
-            ResolvableAddress &address = scopedVariables->resolveAddress(readNode->identifier); // variable address
-            Get *get = new Get(); // GET
-            Store *store = new Store(address); // STORE [address]
-            instructions.append(get);
-            instructions.append(store);
-        } else if (auto writeNode = dynamic_cast<Write *>(command)) {
-            ResolvableAddress &address = resolveValue(writeNode->value); // constant, variable, expression result
-            Load *load = new Load(address); // LOAD [address]
-            Put *put = new Put(); // PUT
-            instructions.append(load);
-            instructions.append(put);
-        } else if (auto assignNode = dynamic_cast<Assignment *>(command)) {
-            ResolvableAddress &variableAddress = scopedVariables->resolveAddress(assignNode->identifier); // get address
-            ExpressionResolution *resolution = assembleExpression(assignNode->expression); // resolve expression
+            Resolution *idRes = resolve(readNode->identifier);
+            Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
+            Get *get = new Get();
 
-            if (auto addRes = dynamic_cast<AddressExpressionResolution *>(resolution)) { // it was just an address, load it
-                Load *load = new Load(addRes->address);
-                instructions.append(load);
-            } else if (auto insRes = dynamic_cast<InstructionExpressionResolution *>(resolution)) { // instructions were generated, store p0 after them
-                instructions.append(insRes->instructionList);
-            }
+            instructions.append(idRes->instructions)
+                    .append(get)
+                    .append(store);
+        } else if (auto writeNode = dynamic_cast<Write *>(command)) { // WRITE
+            Resolution *valRes = resolve(writeNode->value);
+            Instruction *load = valRes->indirect ? static_cast<Instruction *>(new Loadi(valRes->address)) : static_cast<Instruction *>(new Load(valRes->address));
+            Put *put = new Put();
 
-            Store *store = new Store(variableAddress);
-            instructions.append(store);
+            instructions.append(valRes->instructions)
+                    .append(load)
+                    .append(put);
+        } else if (auto assignNode = dynamic_cast<Assignment *>(command)) { // ASSIGN
+            Resolution *idRes = resolve(assignNode->identifier);
+            Resolution *expRes = assembleExpression(assignNode->expression);
+
+            Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
+            Instruction *load = expRes->indirect ? static_cast<Instruction *>(new Loadi(expRes->address)) : static_cast<Instruction *>(new Load(expRes->address));
+
+            instructions.append(idRes->instructions)
+                    .append(expRes->instructions)
+                    .append(load)
+                    .append(store);
         } else if (auto ifNode = dynamic_cast<If *>(command)) { // IF
             InstructionList codeBlock = assembleCommands(ifNode->commands); // assemble inner instructions
             InstructionList &conditionBlock = assembleCondition(ifNode->condition, codeBlock); // assemble condition
@@ -110,6 +121,10 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                 instructions.append(conditionBlock)
                         .append(codeBlock);
             }
+        } else if (auto forNode = dynamic_cast<For *>(command)) {
+            InstructionList codeBlock = assembleCommands(forNode->commands);
+
+
         }
     }
 
@@ -119,14 +134,26 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
 InstructionList &AbstractAssembler::assembleCondition(Condition &condition, InstructionList &codeBlock) {
     InstructionList &instructions = *new InstructionList();
 
-    ResolvableAddress &lhsAddress = resolveValue(condition.lhs);
-    ResolvableAddress &rhsAddress = resolveValue(condition.rhs);
+    Resolution *lhsResolution = resolve(condition.lhs);
+    Resolution *rhsResolution = resolve(condition.rhs);
 
-    Load *load = new Load(lhsAddress);
-    Sub *sub = new Sub(rhsAddress);
+    Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(lhsResolution->address)) : static_cast<Instruction *>(new Load(lhsResolution->address));
+    Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
+    Store *store = new Store(expressionAccumulator);
 
-    instructions.append(load)
-            .append(sub);
+    if (rhsResolution->indirect) {
+        Sub *sub = new Sub(expressionAccumulator);
+        instructions.append(rhsResolution->instructions)
+                .append(rhsLoad)
+                .append(store)
+                .append(lhsResolution->instructions)
+                .append(lhsLoad);
+    } else {
+        Sub *sub = new Sub(rhsResolution->address);
+        instructions.append(lhsResolution->instructions)
+                .append(lhsLoad)
+                .append(sub);
+    }
 
     switch (condition.type) {
         case NOT_EQUAL: {
@@ -176,66 +203,157 @@ InstructionList &AbstractAssembler::assembleCondition(Condition &condition, Inst
     return instructions;
 }
 
-ExpressionResolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
+Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
     try {
         UnaryExpression &unaryExpression = dynamic_cast<UnaryExpression &>(expression);
-        return new AddressExpressionResolution(resolveValue(unaryExpression.value));
+        return resolve(unaryExpression.value);
     } catch (std::bad_cast e) {
         try {
             BinaryExpression &binaryExpression = dynamic_cast<BinaryExpression &>(expression);
             InstructionList &instructionList = *new InstructionList();
 
-            ResolvableAddress &lhsAddress = resolveValue(binaryExpression.lhs);
-            ResolvableAddress &rhsAddress = resolveValue(binaryExpression.rhs);
+            TemporaryVariable *temp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+            scopedVariables->pushVariableScope(temp);
+
+            Resolution *lhsResolution = resolve(binaryExpression.lhs);
+            Resolution *rhsResolution = resolve(binaryExpression.rhs);
+
+            Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(lhsResolution->address)) : static_cast<Instruction *>(new Load(lhsResolution->address));
+            Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
+            Store *store = new Store(expressionAccumulator);
 
             switch (binaryExpression.type) {
                 case ADDITION: {
-                    Load *load = new Load(lhsAddress);
-                    Add *add = new Add(rhsAddress);
+                    if (rhsResolution->indirect) {
+                        Add *add = new Add(expressionAccumulator);
 
-                    instructionList.append(load);
-                    instructionList.append(add);
+                        instructionList.append(lhsResolution->instructions)
+                                .append(lhsLoad)
+                                .append(store)
+                                .append(rhsResolution->instructions)
+                                .append(rhsLoad)
+                                .append(add);
+                    } else {
+                        Add *add = new Add(rhsResolution->address);
+
+                        instructionList.append(lhsResolution->instructions)
+                                .append(lhsLoad)
+                                .append(add);
+                    }
                 }
                     break;
                 case SUBTRACTION: {
-                    Load *load = new Load(lhsAddress);
-                    Sub *sub = new Sub(rhsAddress);
-
-                    instructionList.append(load);
-                    instructionList.append(sub);
+                    throw "NOT IMPLEMENTED";
                 }
                     break;
                 case DIVISION:
+                    throw "NOT IMPLEMENTED";
                     break;
                 case MULTIPLICATION:
+                    throw "NOT IMPLEMENTED";
                     break;
                 case MODULO:
                     throw "NOT IMPLEMENTED";
                     break;
             }
 
-            return new InstructionExpressionResolution(instructionList);
+            Store *resultStore = new Store(temp->getAddress());
+            instructionList.append(resultStore);
+
+            return new Resolution(
+                    instructionList,
+                    temp->getAddress(),
+                    false
+            );
         } catch (std::bad_cast ee) {}
     }
 }
 
-ResolvableAddress &AbstractAssembler::resolveValue(AbstractValue &value) {
-    try {
+Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
+    try { // IDENTIFIER VALUE - a
+        VariableIdentifier &varId = dynamic_cast<VariableIdentifier &>(identifier);
+        ResolvableAddress &address = scopedVariables->resolveAddress(varId);
+        return new Resolution(
+                *new InstructionList(),
+                address,
+                false
+        );
+    } catch (std::bad_cast _) {
+        Variable *var = scopedVariables->resolveVariable(identifier.name);
+        NumberArrayVariable *arrayVar;
+        if (!(arrayVar = dynamic_cast<NumberArrayVariable *>(var))) {
+            throw var->name + " is not an array";
+        }
+
+        try { // ACCESS VALUE - a[0]
+            AccessIdentifier &accId = dynamic_cast<AccessIdentifier &>(identifier);
+
+            if (accId.index < arrayVar->start || accId.index > arrayVar->end) {
+                throw "Trying to access " + arrayVar->toString() + " at index " + std::to_string(accId.index);
+            }
+
+            ResolvableAddress &address = *new ResolvableAddress(arrayVar->getAddress().getAddress()); // copy address
+            address.setOffset(accId.index - arrayVar->start); // set proper offset
+
+            return new Resolution(
+                    *new InstructionList(),
+                    address,
+                    false
+            );
+        } catch (std::bad_cast _) {
+            try { // VARIABLE ACCESS VALUE - a[b]
+                VariableAccessIdentifier &varAccId = dynamic_cast<VariableAccessIdentifier &>(identifier);
+                ResolvableAddress &startValueAddress = constants->getConstant(arrayVar->start)->getAddress(); // arr start
+                Variable *variable = scopedVariables->resolveVariable(varAccId.accessName); // "b" variable
+                ResolvableAddress &arrAddressAddress = constants->getConstant(arrayVar->getAddress().getAddress())->getAddress();
+
+                InstructionList &instructionList = *new InstructionList();
+
+                TemporaryVariable *tempVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                scopedVariables->pushVariableScope(tempVar);
+
+                Load *load = new Load(variable->getAddress()); // load value of b
+                Sub *sub = new Sub(startValueAddress); // subtract value of starting index
+                Add *add = new Add(arrAddressAddress); // add value of array address
+                Store *store = new Store(tempVar->getAddress()); // store indirect address in new variable
+
+                instructionList.append(load)
+                        .append(sub)
+                        .append(add)
+                        .append(store);
+
+                return new Resolution(
+                        instructionList,
+                        tempVar->getAddress(),
+                        true
+                );
+            } catch (std::bad_cast _) {}
+        }
+    }
+}
+
+Resolution *AbstractAssembler::resolve(AbstractValue &value) {
+    try { // NUMBER VALUE - 0
         NumberValue &numberValue = dynamic_cast<NumberValue &>(value);
-        return constants->getConstant(numberValue.value)->getAddress();
-    } catch (std::bad_cast e) {
+        ResolvableAddress &address = constants->getConstant(numberValue.value)->getAddress();
+        return new Resolution(
+                *new InstructionList(),
+                address,
+                false
+        );
+    } catch (std::bad_cast _) {
         try {
             IdentifierValue &identifierValue = dynamic_cast<IdentifierValue &>(value);
-            return scopedVariables->resolveAddress(identifierValue.identifier);
-        } catch (std::bad_cast ee) {
+            return resolve(identifierValue.identifier);
+        } catch (std::bad_cast _) {
             throw "Value resolution error";
         }
     }
 }
 
 InstructionList &AbstractAssembler::assemble() {
-    InstructionList &instructions = assembleConstants();
     getVariablesFromDeclarations();
+    InstructionList &instructions = assembleConstants();
     instructions.append(assembleCommands(program.commands));
     instructions.seal();
     return instructions;

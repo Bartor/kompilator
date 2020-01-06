@@ -10,28 +10,24 @@
 #ifndef COMPILER_ABSTRACTASSEMBLER_H
 #define COMPILER_ABSTRACTASSEMBLER_H
 
-class ExpressionResolution {
+class Resolution {
 public:
-    virtual ~ExpressionResolution() {}
-};
-
-class InstructionExpressionResolution : public ExpressionResolution {
-public:
-    InstructionList &instructionList;
-
-    InstructionExpressionResolution(InstructionList &instructionList) : instructionList(instructionList) {}
-};
-
-class AddressExpressionResolution : public ExpressionResolution {
-public:
+    bool indirect;
+    InstructionList &instructions;
     ResolvableAddress &address;
 
-    AddressExpressionResolution(ResolvableAddress &address) : address(address) {}
+    Resolution(InstructionList &instructionList, ResolvableAddress &address, bool indirect)
+            : instructions(instructionList), address(address), indirect(indirect) {}
 };
 
 class AbstractAssembler {
 private:
-    ResolvableAddress &accumulator = *new ResolvableAddress(0); // p0 is a start of the memory and and a accumulator
+    const long long accumulatorNumber = 3; // this assembler assumes use of three accumulators at the start of the mmry
+
+    ResolvableAddress &primaryAccumulator = *new ResolvableAddress(0); // used mainly by vm instructions
+    ResolvableAddress &secondaryAccumulator = *new ResolvableAddress(1); // used with calculations
+    ResolvableAddress &expressionAccumulator = *new ResolvableAddress(2); // used to remember loaded value
+
     Program &program;
     ScopedVariables *scopedVariables;
     Constants *constants;
@@ -46,10 +42,11 @@ private:
 
     InstructionList &assembleCondition(Condition &condition, InstructionList &codeBlock);
 
-    ResolvableAddress &resolveValue(AbstractValue &value);
+    Resolution *assembleExpression(AbstractExpression &expression);
 
-    ExpressionResolution *assembleExpression(AbstractExpression &expression);
+    Resolution *resolve(AbstractValue &value);
 
+    Resolution *resolve(AbstractIdentifier &identifier);
 public:
     AbstractAssembler(Program &program) : program(program) {}
 

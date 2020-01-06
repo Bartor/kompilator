@@ -1,0 +1,11 @@
+DECLARE
+    arr(1:10), i
+BEGIN
+    arr(1) ASSIGN 5;
+    arr(2) ASSIGN 10;
+    arr(3) ASSIGN 1;
+    arr(4) ASSIGN 2;
+    i ASSIGN arr(3) PLUS arr(4);
+    arr(i) ASSIGN arr(1) PLUS arr(2);
+    WRITE arr(3);
+END

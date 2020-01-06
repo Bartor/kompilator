@@ -6,6 +6,7 @@
       <w>downto</w>
       <w>enddo</w>
       <w>endfor</w>
+      <w>loadi</w>
       <w>pidentifier</w>
       <w>redirections</w>
       <w>resolvableaddress</w>

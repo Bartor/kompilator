@@ -11,3 +11,7 @@ std::string NumberVariable::toString() {
 std::string NumberArrayVariable::toString() {
     return "NumberArrayVariable<" + name + ">[" + std::to_string(start) + ", " + std::to_string(end) + "]";
 }
+
+std::string TemporaryVariable::toString() {
+    return "IteratorUtilVariable<" + name + ">";
+}

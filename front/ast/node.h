@@ -42,6 +42,10 @@ public:
  */
 class AbstractIdentifier : public Node {
 public:
+    std::string &name;
+
+    AbstractIdentifier(std::string &name) : name(name) {}
+
     virtual ~AbstractIdentifier() {}
 };
 
@@ -50,11 +54,9 @@ public:
  */
 class VariableIdentifier : public AbstractIdentifier {
 public:
-    std::string &name;
-
     virtual std::string toString(int indentation);
 
-    VariableIdentifier(std::string &name) : name(name) {}
+    VariableIdentifier(std::string &name) : AbstractIdentifier(name) {}
 };
 
 /**
@@ -62,12 +64,11 @@ public:
  */
 class AccessIdentifier : public AbstractIdentifier {
 public:
-    std::string &name;
     long long index;
 
     virtual std::string toString(int indentation);
 
-    AccessIdentifier(std::string &name, long long index) : name(name), index(index) {}
+    AccessIdentifier(std::string &name, long long index) : AbstractIdentifier(name), index(index) {}
 };
 
 /**
@@ -75,13 +76,12 @@ public:
  */
 class VariableAccessIdentifier : public AbstractIdentifier {
 public:
-    std::string &name;
     std::string &accessName;
 
     virtual std::string toString(int indentation);
 
     VariableAccessIdentifier(std::string &name, std::string &accessName)
-            : name(name), accessName(accessName) {}
+            : AbstractIdentifier(name), accessName(accessName) {}
 };
 
 /**

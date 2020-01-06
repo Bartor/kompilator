@@ -47,4 +47,14 @@ public:
     virtual std::string toString();
 };
 
+class TemporaryVariable : public Variable {
+public:
+    TemporaryVariable(std::string &name, ResolvableAddress &address)
+            : Variable(name, address, true) {
+        size = 1;
+    }
+
+    virtual std::string toString();
+};
+
 #endif //COMPILER_VARIABLES_H

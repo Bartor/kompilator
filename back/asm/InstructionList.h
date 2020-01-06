@@ -7,6 +7,7 @@
 class InstructionList {
 private:
     Stub *afterLast;
+    Stub *first;
     std::vector<Instruction *> instructions;
 public:
     Stub *end();

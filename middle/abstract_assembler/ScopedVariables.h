@@ -1,6 +1,7 @@
 #include "Variables.h"
 #include "../../front/ast/node.h"
 #include <vector>
+#include <string>
 
 #ifndef COMPILER_SCOPEDVARIABLES_H
 #define COMPILER_SCOPEDVARIABLES_H
@@ -9,8 +10,6 @@ class ScopedVariables {
 private:
     std::vector<Variable *> variables;
 
-    Variable *resolveVariable(std::string &name);
-
     long long currentAddress;
 public:
     void pushVariableScope(Variable *variable);
@@ -18,6 +17,8 @@ public:
     void popVariableScope(long long times = 1);
 
     ResolvableAddress &resolveAddress(AbstractIdentifier &identifier);
+
+    Variable *resolveVariable(std::string &name);
 
     ScopedVariables(long long startAddress = 8) : currentAddress(startAddress) {}
 };

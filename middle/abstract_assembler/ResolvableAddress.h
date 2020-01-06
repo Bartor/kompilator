@@ -3,17 +3,16 @@
 
 class ResolvableAddress {
 private:
-    long long selfOffset;
+    long long offset;
     long long address;
-    bool offset;
 public:
-    ResolvableAddress(long long startingAddress = 0) : address(startingAddress), offset(false) {}
+    ResolvableAddress(long long startingAddress = 0) : address(startingAddress), offset(0) {}
 
     long long getAddress();
 
     void setAddress(long long newAddress);
 
-    void setOffset(long long offset);
+    void setOffset(long long newOffset);
 };
 
 

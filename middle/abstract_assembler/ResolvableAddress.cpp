@@ -4,10 +4,10 @@ void ResolvableAddress::setAddress(long long newAddress) {
     address = newAddress;
 }
 
-void ResolvableAddress::setOffset(long long offset) {
-    selfOffset = offset;
+void ResolvableAddress::setOffset(long long newOffset) {
+    offset = newOffset;
 }
 
 long long ResolvableAddress::getAddress() {
-    return offset ? selfOffset : address;
+    return address + offset;
 }
