@@ -4,8 +4,14 @@ std::string TEMPORARY_NAMES = "!TEMP";
 
 InstructionList &AbstractAssembler::assembleConstants() {
     constants = new Constants(accumulatorNumber);
-
     InstructionList &list = *new InstructionList();
+
+    std::cout << "Adding 1 and -1 constants" << std::endl;
+    Constant *resOne = constants->addConstant(1);
+    Constant *resMinusOne = constants->addConstant(-1);
+
+    list.append(resOne->generateConstant());
+    list.append(resMinusOne->generateConstant());
 
     for (const auto num : program.constants.constants) {
         Constant *constantAddress = constants->addConstant(num);
@@ -330,8 +336,63 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                 case DIVISION:
                     throw "NOT IMPLEMENTED";
                     break;
-                case MULTIPLICATION:
-                    throw "NOT IMPLEMENTED";
+                case MULTIPLICATION: { // A * B
+
+                    // A and B are modified and must be copies before...
+                    ResolvableAddress &aAddr = temp->getAddress();
+                    ResolvableAddress &bAddr = expressionAccumulator;
+                    Store *aStore = new Store(temp->getAddress()); // ... a into temporary
+
+                    instructionList.append(lhsResolution->instructions)
+                            .append(lhsLoad)
+                            .append(aStore);
+                    instructionList.append(rhsResolution->instructions)
+                            .append(rhsLoad)
+                            .append(store); // ... b into eacc
+
+                    Sub *accumulatorReset = new Sub(primaryAccumulator);
+                    Store *storeStartResult = new Store(secondaryAccumulator); // result is in secondary accumulator
+                    Load *loadA = new Load(aAddr);
+                    // JZERO [LOAD result]1
+                    Shift *shiftMinusOne = new Shift(constants->getConstant(-1)->getAddress());
+                    Shift *shiftPlusOne = new Shift(constants->getConstant(1)->getAddress());
+                    Sub *subA = new Sub(aAddr);
+                    // JZERO [LOAD A]2
+                    Load *loadResult = new Load(secondaryAccumulator);
+                    Add *addB = new Add(bAddr);
+                    Store *storeResult = new Store(secondaryAccumulator);
+                    Load *loadA2 = new Load(aAddr);
+                    // SHIFT -1
+                    Store *storeA = new Store(aAddr);
+                    Load *loadB = new Load(bAddr);
+                    // SHIFT 1
+                    Store *storeB = new Store(bAddr);
+                    Jump *jumpToLoadA = new Jump(loadA);
+                    Load *loadResult2 = new Load(secondaryAccumulator);
+
+                    Jzero *jzeroToLoadLoadA2 = new Jzero(loadA2);
+                    Jzero *jzeroToLoadResult2 = new Jzero(loadResult2);
+
+                    instructionList.append(accumulatorReset)
+                            .append(storeStartResult)
+                            .append(loadA)
+                            .append(jzeroToLoadResult2)
+                            .append(shiftMinusOne)
+                            .append(shiftPlusOne)
+                            .append(subA)
+                            .append(jzeroToLoadLoadA2)
+                            .append(loadResult)
+                            .append(addB)
+                            .append(storeResult)
+                            .append(loadA2)
+                            .append(shiftMinusOne)
+                            .append(storeA)
+                            .append(loadB)
+                            .append(shiftPlusOne)
+                            .append(storeB)
+                            .append(jumpToLoadA)
+                            .append(loadResult2);
+                }
                     break;
                 case MODULO:
                     throw "NOT IMPLEMENTED";

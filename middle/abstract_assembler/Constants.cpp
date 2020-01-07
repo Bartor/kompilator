@@ -10,7 +10,7 @@ Constant *Constants::addConstant(long long value) {
     ResolvableAddress &address = *new ResolvableAddress(currentAddress++); // assign a new address to it
     Constant *constant = new Constant(value, address); // create it with new value
     constants.push_back(constant); // add it
-    return (constant);
+    return constant;
 }
 
 Constant *Constants::getConstant(long long value) {
