@@ -1,6 +1,6 @@
 #include "AbstractAssembler.h"
 
-std::string TEMPORARY_NAMES = "TEMP";
+std::string TEMPORARY_NAMES = "!TEMP";
 
 InstructionList &AbstractAssembler::assembleConstants() {
     constants = new Constants(accumulatorNumber);
@@ -59,12 +59,17 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
     for (const auto &command : commandList.commands) {
         if (auto readNode = dynamic_cast<Read *>(command)) { // READ
             Resolution *idRes = resolve(readNode->identifier);
+
+            if (!idRes->writable) throw "Trying to read to non-writable variable " + readNode->identifier.name;
+
             Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
             Get *get = new Get();
 
             instructions.append(idRes->instructions)
                     .append(get)
                     .append(store);
+
+            // scopedVariables->popVariableScope(idRes->temporaryVars);
         } else if (auto writeNode = dynamic_cast<Write *>(command)) { // WRITE
             Resolution *valRes = resolve(writeNode->value);
             Instruction *load = valRes->indirect ? static_cast<Instruction *>(new Loadi(valRes->address)) : static_cast<Instruction *>(new Load(valRes->address));
@@ -73,8 +78,13 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
             instructions.append(valRes->instructions)
                     .append(load)
                     .append(put);
+
+            // scopedVariables->popVariableScope(valRes->temporaryVars);
         } else if (auto assignNode = dynamic_cast<Assignment *>(command)) { // ASSIGN
             Resolution *idRes = resolve(assignNode->identifier);
+
+            if (!idRes->writable) throw "Trying to assign to non-writable variable " + assignNode->identifier.name;
+
             Resolution *expRes = assembleExpression(assignNode->expression);
 
             Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
@@ -84,6 +94,8 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                     .append(expRes->instructions)
                     .append(load)
                     .append(store);
+
+            // scopedVariables->popVariableScope(idRes->temporaryVars + expRes->temporaryVars);
         } else if (auto ifNode = dynamic_cast<If *>(command)) { // IF
             InstructionList codeBlock = assembleCommands(ifNode->commands); // assemble inner instructions
             InstructionList &conditionBlock = assembleCondition(ifNode->condition, codeBlock); // assemble condition
@@ -122,9 +134,59 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                         .append(codeBlock);
             }
         } else if (auto forNode = dynamic_cast<For *>(command)) {
-            InstructionList codeBlock = assembleCommands(forNode->commands);
+            NumberVariable *iterator = new NumberVariable(
+                    forNode->variableName,
+                    *new ResolvableAddress(),
+                    true
+            );
 
+            scopedVariables->pushVariableScope(iterator); // create iterator BEFORE commands would use it
 
+            InstructionList &codeBlock = assembleCommands(forNode->commands); // assemble iterated commands
+
+            TemporaryVariable *iterationStart = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+            TemporaryVariable *iterationEnd = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+
+            scopedVariables->pushVariableScope(iterationEnd);
+            scopedVariables->pushVariableScope(iterationStart);
+
+            Resolution *startRes = resolve(forNode->startValue);
+            Resolution *endRes = resolve(forNode->endValue);
+
+            Instruction *startLoad = startRes->indirect ? static_cast<Instruction *>(new Loadi(startRes->address)) : static_cast<Instruction *>(new Load(startRes->address));
+            Instruction *endLoad = endRes->indirect ? static_cast<Instruction *>(new Loadi(endRes->address)) : static_cast<Instruction *>(new Load(endRes->address));
+
+            Store *startStore = new Store(iterationStart->getAddress());
+            Store *endStore = new Store(iterationEnd->getAddress());
+
+            instructions.append(endLoad)
+                    .append(endStore)
+                    .append(startLoad)
+                    .append(startStore); // start value is in accumulator
+
+            //scopedVariables->popVariableScope(startRes->temporaryVars + endRes->temporaryVars);
+
+            Store *storeInI = new Store(iterator->getAddress());
+            Sub *subStartEnd = new Sub(iterationEnd->getAddress());
+            Instruction *j___ = forNode->reversed ? static_cast<Instruction *>(new Jneg(codeBlock.end())) : static_cast<Instruction *>(new Jpos(codeBlock.end()));
+
+            Jump *jumpToSSJ = new Jump(storeInI);
+
+            Load *loadI = new Load(iterator->getAddress());
+            Instruction *incDec = forNode->reversed ? static_cast<Instruction *>(new Dec()) : static_cast<Instruction *>(new Inc());
+
+            Jump *jumpToLoadIncSSJ = new Jump(loadI);
+            codeBlock.append(jumpToLoadIncSSJ);
+
+            instructions.append(jumpToSSJ)
+                    .append(loadI)
+                    .append(incDec)
+                    .append(storeInI)
+                    .append(subStartEnd)
+                    .append(j___)
+                    .append(codeBlock);
+
+            // scopedVariables->popVariableScope(3);
         }
     }
 
@@ -200,6 +262,8 @@ InstructionList &AbstractAssembler::assembleCondition(Condition &condition, Inst
             break;
     }
 
+    // scopedVariables->popVariableScope(lhsResolution->temporaryVars + rhsResolution->temporaryVars);
+
     return instructions;
 }
 
@@ -243,6 +307,23 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                 }
                     break;
                 case SUBTRACTION: {
+                    if (rhsResolution->indirect) {
+                        Sub *sub = new Sub(expressionAccumulator);
+
+                        instructionList.append(rhsResolution->instructions)
+                                .append(rhsLoad)
+                                .append(store)
+                                .append(lhsResolution->instructions)
+                                .append(lhsLoad)
+                                .append(sub);
+                    } else {
+                        Sub *sub = new Sub(rhsResolution->address);
+
+                        instructionList.append(lhsResolution->instructions)
+                                .append(lhsLoad)
+                                .append(sub);
+                    }
+
                     throw "NOT IMPLEMENTED";
                 }
                     break;
@@ -263,28 +344,25 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
             return new Resolution(
                     instructionList,
                     temp->getAddress(),
-                    false
+                    false,
+                    1 + lhsResolution->temporaryVars + rhsResolution->temporaryVars
             );
         } catch (std::bad_cast ee) {}
     }
 }
 
 Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
-    try { // IDENTIFIER VALUE - a
-        VariableIdentifier &varId = dynamic_cast<VariableIdentifier &>(identifier);
-        ResolvableAddress &address = scopedVariables->resolveAddress(varId);
+    Variable *var = scopedVariables->resolveVariable(identifier.name);
+
+    if (auto numVar = dynamic_cast<NumberVariable *>(var)) {
         return new Resolution(
                 *new InstructionList(),
-                address,
-                false
+                numVar->getAddress(),
+                false,
+                0, // zero temp vars used
+                !numVar->readOnly // if it's readOnly, it's not writable -- used for iterators
         );
-    } catch (std::bad_cast _) {
-        Variable *var = scopedVariables->resolveVariable(identifier.name);
-        NumberArrayVariable *arrayVar;
-        if (!(arrayVar = dynamic_cast<NumberArrayVariable *>(var))) {
-            throw var->name + " is not an array";
-        }
-
+    } else if (auto arrayVar = dynamic_cast<NumberArrayVariable *>(var)) {
         try { // ACCESS VALUE - a[0]
             AccessIdentifier &accId = dynamic_cast<AccessIdentifier &>(identifier);
 
@@ -325,11 +403,12 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
                 return new Resolution(
                         instructionList,
                         tempVar->getAddress(),
-                        true
+                        true,
+                        1
                 );
             } catch (std::bad_cast _) {}
         }
-    }
+    } else throw "Variable resolution error";
 }
 
 Resolution *AbstractAssembler::resolve(AbstractValue &value) {

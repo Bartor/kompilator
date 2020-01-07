@@ -3,7 +3,7 @@
 InstructionList::InstructionList() {
     afterLast = new Stub();
     first = new Stub();
-    instructions.push_back(first);
+//    instructions.push_back(first); // first element stub
     instructions.push_back(afterLast); // last element stub
 }
 
@@ -16,13 +16,12 @@ Stub *InstructionList::end() {
 }
 
 Instruction *InstructionList::start() {
-    return first;
+    return instructions.front();
 }
 
 InstructionList &InstructionList::append(InstructionList &list) {
 //    end()->redirect(list.end()); // this seemed to be a good idea but suddenly wasn't
-    instructions.insert(instructions.end() - 1, list.instructions.begin(),
-                        list.instructions.end());
+    instructions.insert(instructions.end() - 1, list.instructions.begin(), list.instructions.end());
     return *this;
 }
 

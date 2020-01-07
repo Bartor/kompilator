@@ -1,0 +1,11 @@
+DECLARE
+    input, x
+BEGIN
+    READ input;
+    FOR i FROM input DOWNTO 1 DO
+        x ASSIGN i PLUS i;
+        FOR k FROM i TO x DO
+            WRITE i;
+        ENDFOR
+    ENDFOR
+END

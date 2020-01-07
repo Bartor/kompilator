@@ -6,18 +6,21 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <typeinfo>
 
 #ifndef COMPILER_ABSTRACTASSEMBLER_H
 #define COMPILER_ABSTRACTASSEMBLER_H
 
 class Resolution {
 public:
+    bool writable;
     bool indirect;
+    long long temporaryVars;
     InstructionList &instructions;
     ResolvableAddress &address;
 
-    Resolution(InstructionList &instructionList, ResolvableAddress &address, bool indirect)
-            : instructions(instructionList), address(address), indirect(indirect) {}
+    Resolution(InstructionList &instructionList, ResolvableAddress &address, bool indirect, long long temporaryVars = 0, bool writable = true)
+            : instructions(instructionList), address(address), indirect(indirect), temporaryVars(temporaryVars), writable(writable) {}
 };
 
 class AbstractAssembler {
