@@ -8,7 +8,7 @@ InstructionList &Constant::generateConstant(Constants *constantsData, Resolvable
         instructions.append(new Dec());
     } else if (value == 1) {
         instructions.append(new Inc());
-    } else {
+    } else if (value) {
         long long newValue = value < 0 ? -value : value;
         int bitPos = log2(newValue) + 1;
 
