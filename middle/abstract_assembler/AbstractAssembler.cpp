@@ -279,11 +279,13 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
         return resolve(unaryExpression.value);
     } catch (std::bad_cast e) {
         try {
-            BinaryExpression &binaryExpression = dynamic_cast<BinaryExpression &>(expression);
-            InstructionList &instructionList = *new InstructionList();
-
             TemporaryVariable *temp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
             scopedVariables->pushVariableScope(temp);
+
+            long long tempVars = 1;
+
+            BinaryExpression &binaryExpression = dynamic_cast<BinaryExpression &>(expression);
+            InstructionList &instructionList = *new InstructionList();
 
             Resolution *lhsResolution = resolve(binaryExpression.lhs);
             Resolution *rhsResolution = resolve(binaryExpression.rhs);
@@ -292,6 +294,7 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
             Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
             Store *store = new Store(expressionAccumulator);
 
+            bool modulo = false;
             switch (binaryExpression.type) {
                 case ADDITION: {
                     if (rhsResolution->indirect) {
@@ -329,15 +332,125 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                                 .append(lhsLoad)
                                 .append(sub);
                     }
-
-                    throw "NOT IMPLEMENTED";
                 }
                     break;
-                case DIVISION:
-                    throw "NOT IMPLEMENTED";
+                case MODULO:
+                    modulo = true;
+                case DIVISION: {
+                    // scaled divisor is to be kept in secondaryAccumulator
+                    // dividend is to be kept in expressionAccumulator
+                    TemporaryVariable *multiplier = temp; // result is store in temp
+                    TemporaryVariable *remain = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *result = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+
+                    tempVars += 2;
+
+                    scopedVariables->pushVariableScope(multiplier);
+                    scopedVariables->pushVariableScope(remain);
+                    scopedVariables->pushVariableScope(result);
+
+                    Sub *sub0 = new Sub(primaryAccumulator);
+                    Store *storeResult = new Store(result->getAddress());
+                    Inc *inc = new Inc();
+                    Store *storeMult = new Store(multiplier->getAddress());
+                    // load A
+                    Store *storeDividend = new Store(expressionAccumulator);
+                    Store *storeRemain = new Store(remain->getAddress());
+                    // load B
+                    // jzero to SUB_END
+                    Store *storeSD = new Store(secondaryAccumulator);
+                    // jump to WHILE_WITHOUT_LOAD
+
+                    Load *loadSD = new Load(secondaryAccumulator); // WHILE
+                    Sub *subDividend = new Sub(expressionAccumulator); // WHILE_WITHOUT_LOAD
+                    // jzero to IF
+                    // Jpos to IF
+
+                    Add *addDividend = new Add(expressionAccumulator);
+                    Shift *shiftByPlusOne = new Shift(constants->getConstant(1)->getAddress());
+                    Store *storeSD2 = new Store(secondaryAccumulator);
+                    Load *loadMult = new Load(multiplier->getAddress());
+                    // shift by +1
+                    Store *storeMult2 = new Store(multiplier->getAddress());
+                    Jump *jumpToWhile = new Jump(loadSD); // JUMP TO WHILE
+
+                    Load *loadRemain = new Load(remain->getAddress()); // IF
+                    Sub *subSD = new Sub(secondaryAccumulator);
+                    // jneg to IF_END
+                    Store *storeRemain2 = new Store(remain->getAddress());
+                    Load *loadResult = new Load(result->getAddress());
+                    Add *addMult = new Add(multiplier->getAddress());
+                    Store *storeResult2 = new Store(result->getAddress());
+
+                    Load *loadSD2 = new Load(secondaryAccumulator); // IF_END
+                    Shift *shiftByMinusOne = new Shift(constants->getConstant(-1)->getAddress());
+                    Store *storeSD3 = new Store(secondaryAccumulator);
+                    Load *loadMult2 = new Load(multiplier->getAddress());
+                    // shift by -1
+                    // jzero END
+                    Store *storeMult3 = new Store(multiplier->getAddress());
+                    Jump *jumpToIf = new Jump(loadRemain); // jump to IF
+
+                    Instruction *loadFinalResult = modulo ? static_cast<Instruction *>(new Load(remain->getAddress())) : static_cast<Instruction *>(new Load(result->getAddress()));
+                    // jump past sub
+                    Sub *sub0End = new Sub(primaryAccumulator);
+                    Stub *stubPastSub = new Stub();
+
+                    //missing jumps
+                    Jzero *jzeroToSubEnd = new Jzero(sub0End);
+                    Jump *jumpToWhileWithoutLoad = new Jump(subDividend);
+                    Jzero *jzeroToIf = new Jzero(loadRemain);
+                    Jpos *jposToIf = new Jpos(loadRemain);
+                    Jneg *jnegToIfEnd = new Jneg(loadSD2);
+                    Jzero *jzeroToEnd = new Jzero(loadFinalResult);
+                    Jump *jumpPastSub = new Jump(stubPastSub);
+
+                    instructionList.append(lhsResolution->instructions)
+                            .append(lhsLoad)
+                            .append(storeDividend)
+                            .append(storeRemain)
+                            .append(sub0)
+                            .append(storeResult)
+                            .append(inc)
+                            .append(storeMult)
+                            .append(rhsResolution->instructions)
+                            .append(rhsLoad)
+                            .append(jzeroToSubEnd)
+                            .append(storeSD)
+                            .append(jumpToWhileWithoutLoad)
+                            .append(loadSD)
+                            .append(subDividend)
+                            .append(jzeroToIf)
+                            .append(jposToIf)
+                            .append(addDividend)
+                            .append(shiftByPlusOne)
+                            .append(storeSD2)
+                            .append(loadMult)
+                            .append(shiftByPlusOne)
+                            .append(storeMult2)
+                            .append(jumpToWhile)
+                            .append(loadRemain)
+                            .append(subSD)
+                            .append(jnegToIfEnd)
+                            .append(storeRemain2)
+                            .append(loadResult)
+                            .append(addMult)
+                            .append(storeResult2)
+                            .append(loadSD2)
+                            .append(shiftByMinusOne)
+                            .append(storeSD3)
+                            .append(loadMult2)
+                            .append(shiftByMinusOne)
+                            .append(jzeroToEnd)
+                            .append(storeMult3)
+                            .append(jumpToIf)
+                            .append(loadFinalResult)
+                            .append(jumpPastSub)
+                            .append(sub0End)
+                            .append(stubPastSub);
+                }
                     break;
                 case MULTIPLICATION: { // A * B
-
                     // A and B are modified and must be copies before...
                     ResolvableAddress &aAddr = temp->getAddress();
                     ResolvableAddress &bAddr = expressionAccumulator;
@@ -394,9 +507,6 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                             .append(loadResult2);
                 }
                     break;
-                case MODULO:
-                    throw "NOT IMPLEMENTED";
-                    break;
             }
 
             Store *resultStore = new Store(temp->getAddress());
@@ -406,7 +516,7 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                     instructionList,
                     temp->getAddress(),
                     false,
-                    1 + lhsResolution->temporaryVars + rhsResolution->temporaryVars
+                    tempVars + lhsResolution->temporaryVars + rhsResolution->temporaryVars
             );
         } catch (std::bad_cast ee) {}
     }
