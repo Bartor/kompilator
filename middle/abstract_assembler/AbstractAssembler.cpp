@@ -10,8 +10,8 @@ InstructionList &AbstractAssembler::assembleConstants() {
     Constant *resOne = constants->addConstant(1);
     Constant *resMinusOne = constants->addConstant(-1);
 
-    list.append(resOne->generateConstant());
-    list.append(resMinusOne->generateConstant());
+    list.append(resOne->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
+    list.append(resMinusOne->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
 
     for (const auto num : program.constants.constants) {
         Constant *constantAddress = constants->addConstant(num);
@@ -19,7 +19,7 @@ InstructionList &AbstractAssembler::assembleConstants() {
         if (constantAddress) {
             std::cout << constantAddress->toString() + " at " << constantAddress->getAddress().getAddress() << std::endl;
 
-            list.append(constantAddress->generateConstant());
+            list.append(constantAddress->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
         }
     }
 

@@ -1,7 +1,9 @@
-#include "Constant.h"
-
 #ifndef COMPILER_CONSTANTS_H
 #define COMPILER_CONSTANTS_H
+
+class Constant;
+
+#include "Constant.h"
 
 class Constants {
 private:
