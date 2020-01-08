@@ -13,5 +13,5 @@ std::string NumberArrayVariable::toString() {
 }
 
 std::string TemporaryVariable::toString() {
-    return "IteratorUtilVariable<" + name + ">";
+    return "TemporaryVariable<" + name + ">";
 }

@@ -1,0 +1,39 @@
+[ sort.imp 
+]
+DECLARE
+	tab(-11:10), x, q, w, j, k, n, a, b
+BEGIN
+	a ASSIGN -11;
+	b ASSIGN 10;
+	n ASSIGN 23;
+	q ASSIGN 5;
+	w ASSIGN 1;
+	FOR i FROM b DOWNTO a DO
+		w  ASSIGN  w TIMES q;
+		w  ASSIGN  w MOD n;
+		tab(i)  ASSIGN  w;
+	ENDFOR
+	FOR ii FROM a TO b DO
+		WRITE tab(ii);
+	ENDFOR
+    q ASSIGN a PLUS 1;
+	FOR iii FROM q TO b DO
+		x  ASSIGN  tab(iii);
+		j  ASSIGN  iii;
+		WHILE j GE a DO
+			k  ASSIGN  j MINUS 1;
+			IF tab(k) GE x THEN
+				tab(j)  ASSIGN  tab(k);
+				j  ASSIGN  j MINUS 1;
+			ELSE
+				k  ASSIGN  j;
+				j  ASSIGN  a;
+			ENDIF
+		ENDWHILE
+		tab(k)  ASSIGN  x;
+	ENDFOR
+	WRITE 0;
+	FOR iiii FROM a TO b DO
+		WRITE tab(iiii);
+	ENDFOR
+END

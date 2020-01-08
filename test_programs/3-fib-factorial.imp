@@ -1,0 +1,26 @@
+[ Silnia  PLUS  Fibonacci
+? 20
+> 2432902008176640000
+> 6765
+]
+DECLARE
+    f(0:100), s(0:100), i(0:100), n, k, l
+BEGIN
+    READ n;
+    f(0) ASSIGN 0;
+    s(0) ASSIGN 1;
+    i(0) ASSIGN 0;
+    f(1) ASSIGN 1;
+    s(1) ASSIGN 1;
+    i(1) ASSIGN 1;
+    FOR j FROM 2 TO n DO
+	k ASSIGN j MINUS 1;
+        l ASSIGN k MINUS 1;
+	i(j) ASSIGN i(k) PLUS 1;
+	f(j) ASSIGN f(k) PLUS f(l);
+        s(j) ASSIGN s(k) TIMES i(j);
+    ENDFOR
+    WRITE s(n);
+    WRITE f(n);
+END
+

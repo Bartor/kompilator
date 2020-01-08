@@ -1,0 +1,28 @@
+[ Rozklad liczby na czynniki pierwsze ]
+DECLARE
+    n, m, reszta, potega, dzielnik
+BEGIN
+    READ n;
+    dzielnik ASSIGN 2;
+    m ASSIGN dzielnik TIMES dzielnik;
+    WHILE n GEQ m DO
+        potega ASSIGN 0;
+        reszta ASSIGN n MOD dzielnik;
+        WHILE reszta EQ 0 DO
+            n ASSIGN n DIV dzielnik;
+            potega ASSIGN potega PLUS 1;
+            reszta ASSIGN n MOD dzielnik;
+        ENDWHILE
+        IF potega GE 0 THEN
+            WRITE dzielnik;
+            WRITE potega;
+        ELSE
+            dzielnik ASSIGN dzielnik PLUS 1;
+            m ASSIGN dzielnik TIMES dzielnik;
+        ENDIF
+    ENDWHILE
+    IF n NEQ 1 THEN
+        WRITE n;
+        WRITE 1;
+    ENDIF
+END

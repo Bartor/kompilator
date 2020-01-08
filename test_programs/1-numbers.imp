@@ -1,0 +1,42 @@
+[ numbers.imp - liczby ]
+DECLARE
+	a, b, c, t(-6:6), d, e, f, g, h, i, j, tab(-5:5)
+BEGIN
+	WRITE 0;
+	WRITE 1;
+	WRITE -2;
+	WRITE 10;
+	WRITE -100;
+	WRITE 10000;
+	WRITE -1234567890;
+
+	a ASSIGN 1234566543;
+	b ASSIGN -677777177;
+	c ASSIGN 15;
+	t(2) ASSIGN -555555555;
+	d ASSIGN 8888;
+	tab(-4) ASSIGN 11;
+	t(0) ASSIGN -999;
+	e ASSIGN 1111111111;
+	tab(0) ASSIGN 7777;
+	f ASSIGN -2048;
+	g ASSIGN -123;
+	t(-3) ASSIGN t(0);
+	tab(-5) ASSIGN a;
+	tab(-5) ASSIGN tab(0) DIV tab(-4);
+	t(-5) ASSIGN tab(0);
+
+	READ h;
+	i ASSIGN 1;
+	j ASSIGN h PLUS c;
+	
+	WRITE j; [ j = h + 15 ]
+	WRITE c; [ c = 15 ]
+	WRITE t(-3); [ -999 ]
+	WRITE t(2); [ -555555555 ]
+	WRITE t(-5); [ 7777 ]
+	WRITE t(0); [ -999 ]
+	WRITE tab(-4); [ 11 ]
+	WRITE tab(-5); [ 707 ]
+	WRITE tab(0); [ 7777 ]
+END

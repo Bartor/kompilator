@@ -1,0 +1,23 @@
+[ Silnia
+? 20
+> 2432902008176640000
+]
+DECLARE
+  s(0:100), n, m, a, j
+BEGIN
+    READ n;
+    s(0) ASSIGN 1;
+    m ASSIGN n;
+    FOR i FROM 1 TO m DO
+		a ASSIGN i MOD 2;
+		j ASSIGN i MINUS 1;
+		IF a EQ 1 THEN
+			s(i) ASSIGN s(j) TIMES m;
+		ELSE
+			s(i) ASSIGN m TIMES s(j);
+		ENDIF
+		m ASSIGN m MINUS 1;
+    ENDFOR
+    WRITE s(n);
+END
+

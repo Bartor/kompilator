@@ -2,6 +2,7 @@
 #include "../../front/ast/node.h"
 #include <vector>
 #include <string>
+#include <iostream>
 
 #ifndef COMPILER_SCOPEDVARIABLES_H
 #define COMPILER_SCOPEDVARIABLES_H

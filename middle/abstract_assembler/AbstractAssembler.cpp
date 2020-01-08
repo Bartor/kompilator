@@ -52,15 +52,9 @@ void AbstractAssembler::getVariablesFromDeclarations() {
     }
 }
 
-InstructionList &AbstractAssembler::generateBoilerplate() {
-    InstructionList &instructionList = *new InstructionList();
-
-    // todo generate multiplication, modulo and division code
-    return instructionList;
-}
-
-InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
+SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) {
     InstructionList &instructions = *new InstructionList();
+    long long tempVars = 0;
 
     for (const auto &command : commandList.commands) {
         if (auto readNode = dynamic_cast<Read *>(command)) { // READ
@@ -75,7 +69,7 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                     .append(get)
                     .append(store);
 
-            // scopedVariables->popVariableScope(idRes->temporaryVars);
+            tempVars += idRes->temporaryVars;
         } else if (auto writeNode = dynamic_cast<Write *>(command)) { // WRITE
             Resolution *valRes = resolve(writeNode->value);
             Instruction *load = valRes->indirect ? static_cast<Instruction *>(new Loadi(valRes->address)) : static_cast<Instruction *>(new Load(valRes->address));
@@ -85,7 +79,7 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                     .append(load)
                     .append(put);
 
-            // scopedVariables->popVariableScope(valRes->temporaryVars);
+            tempVars += valRes->temporaryVars;
         } else if (auto assignNode = dynamic_cast<Assignment *>(command)) { // ASSIGN
             Resolution *idRes = resolve(assignNode->identifier);
 
@@ -101,43 +95,56 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                     .append(load)
                     .append(store);
 
-            // scopedVariables->popVariableScope(idRes->temporaryVars + expRes->temporaryVars);
+            tempVars += idRes->temporaryVars;
+            tempVars += expRes->temporaryVars;
         } else if (auto ifNode = dynamic_cast<If *>(command)) { // IF
-            InstructionList codeBlock = assembleCommands(ifNode->commands); // assemble inner instructions
-            InstructionList &conditionBlock = assembleCondition(ifNode->condition, codeBlock); // assemble condition
+            SimpleResolution *codeResolution = assembleCommands(ifNode->commands); // assemble inner instructions
+            SimpleResolution *conditionResolution = assembleCondition(ifNode->condition, codeResolution->instructions); // assemble condition
 
-            instructions.append(conditionBlock) // add condition code
-                    .append(codeBlock); // add inner block code
+            instructions.append(conditionResolution->instructions) // add condition code
+                    .append(codeResolution->instructions); // add inner block code
+
+//            scopedVariables->popVariableScope(codeResolution->temporaryVars);
+//            tempVars += conditionResolution->temporaryVars;
         } else if (auto ifElseNode = dynamic_cast<IfElse *>(command)) { // IF ELSE
-            InstructionList ifCodeBlock = assembleCommands(ifElseNode->commands);
-            InstructionList &conditionBlock = assembleCondition(ifElseNode->condition, ifCodeBlock);
-            InstructionList elseCodeBlock = assembleCommands(ifElseNode->elseCommands);
+            SimpleResolution *ifCodeResolution = assembleCommands(ifElseNode->commands);
+            SimpleResolution *conditionResolution = assembleCondition(ifElseNode->condition, ifCodeResolution->instructions);
+            SimpleResolution *elseCodeResolution = assembleCommands(ifElseNode->elseCommands);
 
-            Jump *jump = new Jump(elseCodeBlock.end());
-            ifCodeBlock.append(jump);
+            Jump *jump = new Jump(elseCodeResolution->instructions.end());
+            ifCodeResolution->instructions.append(jump);
 
-            instructions.append(conditionBlock)
-                    .append(ifCodeBlock)
-                    .append(elseCodeBlock);
+            instructions.append(conditionResolution->instructions)
+                    .append(ifCodeResolution->instructions)
+                    .append(elseCodeResolution->instructions);
+
+//            scopedVariables->popVariableScope(ifCodeResolution->temporaryVars + elseCodeResolution->temporaryVars);
+//            tempVars += conditionResolution->temporaryVars;
         } else if (auto whileNode = dynamic_cast<While *>(command)) { // WHILE
-            InstructionList codeBlock = assembleCommands(whileNode->commands);
+            SimpleResolution *codeResolution = assembleCommands(whileNode->commands);
 
             if (whileNode->doWhile) {
                 InstructionList *jumpBlock = new InstructionList();
-                Jump *jump = new Jump(codeBlock.start());
+                Jump *jump = new Jump(codeResolution->instructions.start());
                 jumpBlock->append(jump);
 
-                InstructionList &conditionBlock = assembleCondition(whileNode->condition, *jumpBlock);
-                instructions.append(codeBlock)
-                        .append(conditionBlock)
+                SimpleResolution *conditionResolution = assembleCondition(whileNode->condition, *jumpBlock);
+                instructions.append(codeResolution->instructions)
+                        .append(conditionResolution->instructions)
                         .append(*jumpBlock);
-            } else {
-                InstructionList &conditionBlock = assembleCondition(whileNode->condition, codeBlock);
-                Jump *jump = new Jump(conditionBlock.start());
-                codeBlock.append(jump);
 
-                instructions.append(conditionBlock)
-                        .append(codeBlock);
+//                scopedVariables->popVariableScope(codeResolution->temporaryVars);
+//                tempVars += conditionResolution->temporaryVars;
+            } else {
+                SimpleResolution *conditionResolution = assembleCondition(whileNode->condition, codeResolution->instructions);
+                Jump *jump = new Jump(conditionResolution->instructions.start());
+                codeResolution->instructions.append(jump);
+
+                instructions.append(conditionResolution->instructions)
+                        .append(codeResolution->instructions);
+
+//                scopedVariables->popVariableScope(codeResolution->temporaryVars);
+//                tempVars += conditionResolution->temporaryVars;
             }
         } else if (auto forNode = dynamic_cast<For *>(command)) {
             NumberVariable *iterator = new NumberVariable(
@@ -148,7 +155,7 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
 
             scopedVariables->pushVariableScope(iterator); // create iterator BEFORE commands would use it
 
-            InstructionList &codeBlock = assembleCommands(forNode->commands); // assemble iterated commands
+            SimpleResolution *codeResolution = assembleCommands(forNode->commands); // assemble iterated commands
 
             TemporaryVariable *iterationStart = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
             TemporaryVariable *iterationEnd = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
@@ -168,13 +175,11 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
             instructions.append(endLoad)
                     .append(endStore)
                     .append(startLoad)
-                    .append(startStore); // start value is in accumulator
-
-            //scopedVariables->popVariableScope(startRes->temporaryVars + endRes->temporaryVars);
+                    .append(startStore);
 
             Store *storeInI = new Store(iterator->getAddress());
             Sub *subStartEnd = new Sub(iterationEnd->getAddress());
-            Instruction *j___ = forNode->reversed ? static_cast<Instruction *>(new Jneg(codeBlock.end())) : static_cast<Instruction *>(new Jpos(codeBlock.end()));
+            Instruction *j___ = forNode->reversed ? static_cast<Instruction *>(new Jneg(codeResolution->instructions.end())) : static_cast<Instruction *>(new Jpos(codeResolution->instructions.end()));
 
             Jump *jumpToSSJ = new Jump(storeInI);
 
@@ -182,7 +187,7 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
             Instruction *incDec = forNode->reversed ? static_cast<Instruction *>(new Dec()) : static_cast<Instruction *>(new Inc());
 
             Jump *jumpToLoadIncSSJ = new Jump(loadI);
-            codeBlock.append(jumpToLoadIncSSJ);
+            codeResolution->instructions.append(jumpToLoadIncSSJ);
 
             instructions.append(jumpToSSJ)
                     .append(loadI)
@@ -190,16 +195,21 @@ InstructionList &AbstractAssembler::assembleCommands(CommandList &commandList) {
                     .append(storeInI)
                     .append(subStartEnd)
                     .append(j___)
-                    .append(codeBlock);
+                    .append(codeResolution->instructions);
 
-            // scopedVariables->popVariableScope(3);
+            std::cout << "returning from for code and popping " << codeResolution->temporaryVars << " vars" << std::endl;
+//            scopedVariables->popVariableScope(codeResolution->temporaryVars);
+//            tempVars += 3 + startRes->temporaryVars + endRes->temporaryVars; //  iterator + iterationStart + iterationEnd
         }
     }
 
-    return instructions;
+    return new SimpleResolution(
+            instructions,
+            tempVars
+    );
 }
 
-InstructionList &AbstractAssembler::assembleCondition(Condition &condition, InstructionList &codeBlock) {
+SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, InstructionList &codeBlock) {
     InstructionList &instructions = *new InstructionList();
 
     Resolution *lhsResolution = resolve(condition.lhs);
@@ -268,9 +278,10 @@ InstructionList &AbstractAssembler::assembleCondition(Condition &condition, Inst
             break;
     }
 
-    // scopedVariables->popVariableScope(lhsResolution->temporaryVars + rhsResolution->temporaryVars);
-
-    return instructions;
+    return new SimpleResolution(
+            instructions,
+            lhsResolution->temporaryVars + rhsResolution->temporaryVars
+    );
 }
 
 Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
@@ -604,7 +615,9 @@ Resolution *AbstractAssembler::resolve(AbstractValue &value) {
 InstructionList &AbstractAssembler::assemble() {
     getVariablesFromDeclarations();
     InstructionList &instructions = assembleConstants();
-    instructions.append(assembleCommands(program.commands));
+    SimpleResolution *programCodeResolution = assembleCommands(program.commands);
+    std::cout << "Assembled programs returning " << programCodeResolution->temporaryVars << " temporary variables " << std::endl;
+    instructions.append(programCodeResolution->instructions);
     instructions.seal();
     return instructions;
 }

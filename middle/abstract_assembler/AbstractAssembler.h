@@ -23,6 +23,14 @@ public:
             : instructions(instructionList), address(address), indirect(indirect), temporaryVars(temporaryVars), writable(writable) {}
 };
 
+class SimpleResolution {
+public:
+    long long temporaryVars;
+    InstructionList &instructions;
+
+    SimpleResolution(InstructionList &instructionList, long long temporaryVar) : instructions(instructionList), temporaryVars(temporaryVar) {}
+};
+
 class AbstractAssembler {
 private:
     const long long accumulatorNumber = 3; // this assembler assumes use of three accumulators at the start of the mmry
@@ -37,19 +45,18 @@ private:
 
     void getVariablesFromDeclarations();
 
-    InstructionList &generateBoilerplate();
-
     InstructionList &assembleConstants();
 
-    InstructionList &assembleCommands(CommandList &commandList);
+    SimpleResolution *assembleCommands(CommandList &commandList);
 
-    InstructionList &assembleCondition(Condition &condition, InstructionList &codeBlock);
+    SimpleResolution *assembleCondition(Condition &condition, InstructionList &codeBlock);
 
     Resolution *assembleExpression(AbstractExpression &expression);
 
     Resolution *resolve(AbstractValue &value);
 
     Resolution *resolve(AbstractIdentifier &identifier);
+
 public:
     AbstractAssembler(Program &program) : program(program) {}
 

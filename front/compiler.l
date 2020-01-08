@@ -11,13 +11,13 @@
 
 pidentifier [_a-z]+
 number -?([0-9]|[1-9][0-9]*)
-comment \[.*\]
+comment \[(.|\n)*\]
 
 %%
+{comment}       ;
 \n              ;
 \r              ;
 [[:blank:]]+    ;
-{comment}       ;
 {pidentifier}   { yylval.stringValue = new std::string(yytext, yyleng); return PIDENTIFIER; }
 {number}        { yylval.numberValue = atoi(yytext); return NUMBER; }
 DECLARE         { return TOKEN(DECLARE); }
