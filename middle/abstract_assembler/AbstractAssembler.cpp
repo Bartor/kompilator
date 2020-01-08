@@ -54,9 +54,10 @@ void AbstractAssembler::getVariablesFromDeclarations() {
 
 SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) {
     InstructionList &instructions = *new InstructionList();
-    long long tempVars = 0;
 
     for (const auto &command : commandList.commands) {
+        long long tempVars = 0;
+
         if (auto readNode = dynamic_cast<Read *>(command)) { // READ
             Resolution *idRes = resolve(readNode->identifier);
 
@@ -104,8 +105,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
             instructions.append(conditionResolution->instructions) // add condition code
                     .append(codeResolution->instructions); // add inner block code
 
-//            scopedVariables->popVariableScope(codeResolution->temporaryVars);
-//            tempVars += conditionResolution->temporaryVars;
+            tempVars += conditionResolution->temporaryVars;
         } else if (auto ifElseNode = dynamic_cast<IfElse *>(command)) { // IF ELSE
             SimpleResolution *ifCodeResolution = assembleCommands(ifElseNode->commands);
             SimpleResolution *conditionResolution = assembleCondition(ifElseNode->condition, ifCodeResolution->instructions);
@@ -118,8 +118,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                     .append(ifCodeResolution->instructions)
                     .append(elseCodeResolution->instructions);
 
-//            scopedVariables->popVariableScope(ifCodeResolution->temporaryVars + elseCodeResolution->temporaryVars);
-//            tempVars += conditionResolution->temporaryVars;
+            tempVars += conditionResolution->temporaryVars;
         } else if (auto whileNode = dynamic_cast<While *>(command)) { // WHILE
             SimpleResolution *codeResolution = assembleCommands(whileNode->commands);
 
@@ -133,8 +132,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                         .append(conditionResolution->instructions)
                         .append(*jumpBlock);
 
-//                scopedVariables->popVariableScope(codeResolution->temporaryVars);
-//                tempVars += conditionResolution->temporaryVars;
+                tempVars += conditionResolution->temporaryVars;
             } else {
                 SimpleResolution *conditionResolution = assembleCondition(whileNode->condition, codeResolution->instructions);
                 Jump *jump = new Jump(conditionResolution->instructions.start());
@@ -143,8 +141,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                 instructions.append(conditionResolution->instructions)
                         .append(codeResolution->instructions);
 
-//                scopedVariables->popVariableScope(codeResolution->temporaryVars);
-//                tempVars += conditionResolution->temporaryVars;
+                tempVars += conditionResolution->temporaryVars;
             }
         } else if (auto forNode = dynamic_cast<For *>(command)) {
             NumberVariable *iterator = new NumberVariable(
@@ -154,8 +151,6 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
             );
 
             scopedVariables->pushVariableScope(iterator); // create iterator BEFORE commands would use it
-
-            SimpleResolution *codeResolution = assembleCommands(forNode->commands); // assemble iterated commands
 
             TemporaryVariable *iterationStart = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
             TemporaryVariable *iterationEnd = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
@@ -177,6 +172,8 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                     .append(startLoad)
                     .append(startStore);
 
+            SimpleResolution *codeResolution = assembleCommands(forNode->commands); // assemble iterated commands
+
             Store *storeInI = new Store(iterator->getAddress());
             Sub *subStartEnd = new Sub(iterationEnd->getAddress());
             Instruction *j___ = forNode->reversed ? static_cast<Instruction *>(new Jneg(codeResolution->instructions.end())) : static_cast<Instruction *>(new Jpos(codeResolution->instructions.end()));
@@ -197,15 +194,15 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                     .append(j___)
                     .append(codeResolution->instructions);
 
-            std::cout << "returning from for code and popping " << codeResolution->temporaryVars << " vars" << std::endl;
-//            scopedVariables->popVariableScope(codeResolution->temporaryVars);
-//            tempVars += 3 + startRes->temporaryVars + endRes->temporaryVars; //  iterator + iterationStart + iterationEnd
+            tempVars += 3 + startRes->temporaryVars + endRes->temporaryVars; //  iterator + iterationStart + iterationEnd
         }
+
+        scopedVariables->popVariableScope(tempVars);
     }
 
     return new SimpleResolution(
             instructions,
-            tempVars
+            0
     );
 }
 
@@ -351,14 +348,13 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                     // scaled divisor is to be kept in secondaryAccumulator
                     // dividend is to be kept in expressionAccumulator
                     TemporaryVariable *multiplier = temp; // result is store in temp
+
                     TemporaryVariable *remain = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *result = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-
-                    tempVars += 2;
-
-                    scopedVariables->pushVariableScope(multiplier);
                     scopedVariables->pushVariableScope(remain);
                     scopedVariables->pushVariableScope(result);
+
+                    tempVars += 2; // as mult is kept in default temp for expression, we don't need to push the scope
 
                     Sub *sub0 = new Sub(primaryAccumulator);
                     Store *storeResult = new Store(result->getAddress());
@@ -563,14 +559,15 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
         } catch (std::bad_cast _) {
             try { // VARIABLE ACCESS VALUE - a[b]
                 VariableAccessIdentifier &varAccId = dynamic_cast<VariableAccessIdentifier &>(identifier);
+
+                TemporaryVariable *tempVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                scopedVariables->pushVariableScope(tempVar);
+
                 ResolvableAddress &startValueAddress = constants->getConstant(arrayVar->start)->getAddress(); // arr start
                 Variable *variable = scopedVariables->resolveVariable(varAccId.accessName); // "b" variable
                 ResolvableAddress &arrAddressAddress = constants->getConstant(arrayVar->getAddress().getAddress())->getAddress();
 
                 InstructionList &instructionList = *new InstructionList();
-
-                TemporaryVariable *tempVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                scopedVariables->pushVariableScope(tempVar);
 
                 Load *load = new Load(variable->getAddress()); // load value of b
                 Sub *sub = new Sub(startValueAddress); // subtract value of starting index
@@ -600,7 +597,8 @@ Resolution *AbstractAssembler::resolve(AbstractValue &value) {
         return new Resolution(
                 *new InstructionList(),
                 address,
-                false
+                false,
+                0
         );
     } catch (std::bad_cast _) {
         try {

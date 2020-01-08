@@ -13,13 +13,13 @@ BEGIN
 		w  ASSIGN  w MOD n;
 		tab(i)  ASSIGN  w;
 	ENDFOR
-	FOR ii FROM a TO b DO
-		WRITE tab(ii);
+	FOR i FROM a TO b DO
+		WRITE tab(i);
 	ENDFOR
     q ASSIGN a PLUS 1;
-	FOR iii FROM q TO b DO
-		x  ASSIGN  tab(iii);
-		j  ASSIGN  iii;
+	FOR i FROM q TO b DO
+		x  ASSIGN  tab(i);
+		j  ASSIGN  i;
 		WHILE j GE a DO
 			k  ASSIGN  j MINUS 1;
 			IF tab(k) GE x THEN
@@ -33,7 +33,7 @@ BEGIN
 		tab(k)  ASSIGN  x;
 	ENDFOR
 	WRITE 0;
-	FOR iiii FROM a TO b DO
-		WRITE tab(iiii);
+	FOR i FROM a TO b DO
+		WRITE tab(i);
 	ENDFOR
 END
