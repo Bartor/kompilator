@@ -42,20 +42,25 @@ int main(int argc, char **argv) {
 
     std::cout << std::endl << "- Assembling -" << std::endl;
 
-    InstructionList &assembled = assembler->assemble();
+    try {
+        InstructionList &assembled = assembler->assemble();
 
-    std::cout << std::endl << "-=- A S M -=-" << std::endl;
+        std::cout << std::endl << "-=- A S M -=-" << std::endl;
 
-    std::ofstream output;
-    output.open(argv[2] ? argv[2] : "a.out");
-    for (const auto &ins : assembled.getInstructions()) {
-        if (!ins->stub) {
-            std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
-            output << ins->toAssemblyCode(true) << std::endl;
+        std::ofstream output;
+        output.open(argv[2] ? argv[2] : "a.out");
+        for (const auto &ins : assembled.getInstructions()) {
+            if (!ins->stub) {
+                std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
+                output << ins->toAssemblyCode(true) << std::endl;
+            }
         }
-    }
 
-    output.close();
+        output.close();
+    } catch (std::string errorMessage) {
+        std::cout << "=!= COMPILATION ERROR =!=" << std::endl << errorMessage << std::endl;
+        return 1;
+    }
 
     return 0;
 }
