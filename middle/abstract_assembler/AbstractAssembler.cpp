@@ -458,22 +458,21 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                 }
                     break;
                 case MULTIPLICATION: { // A * B
-                    // A and B are modified and must be copies before...
+                    // A and B are modified and must be copied before...
                     ResolvableAddress &aAddr = temp->getAddress();
                     ResolvableAddress &bAddr = expressionAccumulator;
-                    Store *aStore = new Store(temp->getAddress()); // ... a into temporary
+                    Store *storeA = new Store(temp->getAddress()); // ... a into temporary
+                    Store *storeB = store;
 
-                    instructionList.append(lhsResolution->instructions)
-                            .append(lhsLoad)
-                            .append(aStore);
-                    instructionList.append(rhsResolution->instructions)
-                            .append(rhsLoad)
-                            .append(store); // ... b into eacc
+                    TemporaryVariable *negativeOperationTemporary = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    scopedVariables->pushVariableScope(negativeOperationTemporary);
+
+                    tempVars += 1;
 
                     Sub *accumulatorReset = new Sub(primaryAccumulator);
                     Store *storeStartResult = new Store(secondaryAccumulator); // result is in secondary accumulator
                     Load *loadA = new Load(aAddr);
-                    // JZERO [LOAD result]1
+                    // jzero to loadResult
                     Shift *shiftMinusOne = new Shift(constants->getConstant(-1)->getAddress());
                     Shift *shiftPlusOne = new Shift(constants->getConstant(1)->getAddress());
                     Sub *subA = new Sub(aAddr);
@@ -483,18 +482,93 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                     Store *storeResult = new Store(secondaryAccumulator);
                     Load *loadA2 = new Load(aAddr);
                     // SHIFT -1
-                    Store *storeA = new Store(aAddr);
+                    Store *storeA2 = new Store(aAddr);
                     Load *loadB = new Load(bAddr);
                     // SHIFT 1
-                    Store *storeB = new Store(bAddr);
+                    Store *storeB2 = new Store(bAddr);
                     Jump *jumpToLoadA = new Jump(loadA);
                     Load *loadResult2 = new Load(secondaryAccumulator);
 
+                    Stub *stubEnd = new Stub();
+
                     Jzero *jzeroToLoadLoadA2 = new Jzero(loadA2);
                     Jzero *jzeroToLoadResult2 = new Jzero(loadResult2);
+                    Jump *jumpToStubEnd = new Jump(stubEnd);
 
-                    instructionList.append(accumulatorReset)
-                            .append(storeStartResult)
+                    // NEGATIVE NUMBERS: when b is negative, this algorithm works
+                    // if (b < 0) { if (a < 0) { a = -a; b = -b } } else if (a < 0) { [b, a] = [a, b] }
+
+                    Sub *subNegativeOp = new Sub(negativeOperationTemporary->getAddress()); // subtract b TWO TIMES
+                    Store *storeNegatedB = new Store(bAddr); // store negated b in bAddr aka eacc
+                    Store *storeNegatedA = new Store(aAddr); // store negated a in aAddr aka temp
+
+                    InstructionList &bNegation = *new InstructionList();
+                    InstructionList &aNegation = *new InstructionList();
+
+                    if (rhsResolution->indirect) {
+                        Store *storeBInTemp = new Store(negativeOperationTemporary->getAddress()); // store b val in temp for negatives
+
+                        bNegation.append(rhsResolution->instructions)
+                                .append(storeBInTemp)
+                                .append(subNegativeOp)
+                                .append(subNegativeOp);
+                    } else {
+                        Sub *subNegatedDirectB = new Sub(rhsResolution->address);
+
+                        bNegation.append(new Sub(primaryAccumulator))
+                                .append(subNegatedDirectB);
+                    }
+                    bNegation.append(storeNegatedB);
+
+                    if (lhsResolution->indirect) {
+                        Store *storeAInTemp = new Store(negativeOperationTemporary->getAddress());
+
+                        aNegation.append(lhsResolution->instructions)
+                                .append(storeAInTemp)
+                                .append(subNegativeOp)
+                                .append(subNegativeOp)
+                                .append(storeNegatedA);
+                    } else {
+                        Sub *subNegatedDirectA = new Sub(lhsResolution->address);
+
+                        aNegation.append(new Sub(primaryAccumulator))
+                                .append(subNegatedDirectA);
+                    }
+                    aNegation.append(storeNegatedA);
+
+                    Jump *jumpBackToAlgorithm = new Jump(loadA);
+
+                    InstructionList &switchAB = *new InstructionList();
+
+                    Store *storeAInTemp = new Store(negativeOperationTemporary->getAddress());
+                    // load b
+                    Store *storeBInA = new Store(aAddr);
+                    Load *loadAFromTemp = new Load(negativeOperationTemporary->getAddress());
+                    Store *storeAInB = new Store(bAddr);
+
+                    switchAB.append(storeAInTemp)
+                            .append(loadB)
+                            .append(storeBInA)
+                            .append(loadAFromTemp)
+                            .append(storeAInB);
+
+                    Stub *stubStartOfNegs = new Stub();
+                    Jneg *jumpIfBNegative = new Jneg(stubStartOfNegs); // jump to special neg loadings
+                    Jpos *jposBackToAlgorithm = new Jpos(storeA);
+                    Jneg *jnegToSwitchAB = new Jneg(switchAB.start());
+
+                    instructionList.append(accumulatorReset) // rest acc
+                            .append(storeStartResult) // store 0 in result
+                            .append(rhsResolution->instructions)
+                            .append(rhsLoad)
+                            .append(jzeroToLoadResult2) // jump to end if 0
+                            .append(jumpIfBNegative) // jump to special neg loadings
+                            .append(storeB) // store b in eacc
+                            .append(lhsResolution->instructions)
+                            .append(lhsLoad)
+                            .append(jzeroToLoadResult2) // jump to end if 0
+                            .append(storeA) // store a in temp
+                            .append(jnegToSwitchAB) // b > 0, a < 0, switch them
                             .append(loadA)
                             .append(jzeroToLoadResult2)
                             .append(shiftMinusOne)
@@ -506,12 +580,25 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                             .append(storeResult)
                             .append(loadA2)
                             .append(shiftMinusOne)
-                            .append(storeA)
+                            .append(storeA2)
                             .append(loadB)
                             .append(shiftPlusOne)
-                            .append(storeB)
+                            .append(storeB2)
                             .append(jumpToLoadA)
-                            .append(loadResult2);
+                            .append(loadResult2)
+                            .append(jumpToStubEnd) // jump to end after loading result
+                                    /* NEGATIVE MULTIPLICATION AREA */
+                            .append(stubStartOfNegs)
+                            .append(storeB)
+                            .append(lhsResolution->instructions)
+                            .append(lhsLoad)
+                            .append(jposBackToAlgorithm) // a > 0, b < 0, back to algo
+                            .append(bNegation) // a < 0, b < 0, negate both
+                            .append(aNegation)
+                            .append(jumpBackToAlgorithm) // back to algo
+                            .append(switchAB) // a < 0, b > 0 swtich them
+                            .append(jumpBackToAlgorithm) // back to algo
+                            .append(stubEnd);
                 }
                     break;
             }
