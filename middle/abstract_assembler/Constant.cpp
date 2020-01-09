@@ -8,6 +8,14 @@ InstructionList &Constant::generateConstant(Constants *constantsData, Resolvable
         instructions.append(new Dec());
     } else if (value == 1) {
         instructions.append(new Inc());
+    } else if (abs(value) < 12) { // todo make this value somehow smart
+        long long valCpy = value;
+
+        if (valCpy > 0) {
+            while (valCpy-- > 0) instructions.append(new Inc());
+        } else {
+            while (valCpy++ < 0) instructions.append(new Dec());
+        }
     } else if (value) {
         long long newValue = value < 0 ? -value : value;
         int bitPos = log2(newValue) + 1;

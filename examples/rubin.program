@@ -1,0 +1,8 @@
+DECLARE
+    a, b(-2:2)
+BEGIN
+    a ASSIGN 1;
+    b(a) ASSIGN 1;
+    WRITE b(1);
+    WRITE b(a);
+END

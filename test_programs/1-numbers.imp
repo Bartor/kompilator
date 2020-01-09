@@ -30,13 +30,13 @@ BEGIN
 	i ASSIGN 1;
 	j ASSIGN h PLUS c;
 	
-	WRITE j; [ j = h + 15 ]
-	WRITE c; [ c = 15 ]
-	WRITE t(-3); [ -999 ]
-	WRITE t(2); [ -555555555 ]
-	WRITE t(-5); [ 7777 ]
-	WRITE t(0); [ -999 ]
-	WRITE tab(-4); [ 11 ]
-	WRITE tab(-5); [ 707 ]
-	WRITE tab(0); [ 7777 ]
+	WRITE j;
+	WRITE c;
+	WRITE t(-3);
+	WRITE t(2);
+	WRITE t(-5);
+	WRITE t(0);
+	WRITE tab(-4);
+	WRITE tab(-5);
+	WRITE tab(0);
 END

@@ -167,8 +167,10 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
             Store *startStore = new Store(iterationStart->getAddress());
             Store *endStore = new Store(iterationEnd->getAddress());
 
-            instructions.append(endLoad)
+            instructions.append(endRes->instructions)
+                    .append(endLoad)
                     .append(endStore)
+                    .append(startRes->instructions)
                     .append(startLoad)
                     .append(startStore);
 
@@ -351,10 +353,12 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
 
                     TemporaryVariable *remain = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *result = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *signTemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    scopedVariables->pushVariableScope(signTemp); // 0 == keep sign, !0 == change sign
                     scopedVariables->pushVariableScope(remain);
                     scopedVariables->pushVariableScope(result);
 
-                    tempVars += 2; // as mult is kept in default temp for expression, we don't need to push the scope
+                    tempVars += 3; // as mult is kept in default temp for expression, we don't need to push the scope
 
                     Sub *sub0 = new Sub(primaryAccumulator);
                     Store *storeResult = new Store(result->getAddress());
@@ -398,7 +402,6 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                     Store *storeMult3 = new Store(multiplier->getAddress());
                     Jump *jumpToIf = new Jump(loadRemain); // jump to IF
 
-                    Instruction *loadFinalResult = modulo ? static_cast<Instruction *>(new Load(remain->getAddress())) : static_cast<Instruction *>(new Load(result->getAddress()));
                     // jump past sub
                     Sub *sub0End = new Sub(primaryAccumulator);
                     Stub *stubPastSub = new Stub();
@@ -407,13 +410,136 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                     Jzero *jzeroToSubEnd = new Jzero(sub0End);
                     Jump *jumpToWhileWithoutLoad = new Jump(subDividend);
                     Jzero *jzeroToIf = new Jzero(loadRemain);
+                    //jzero to end after signResolution
                     Jpos *jposToIf = new Jpos(loadRemain);
                     Jneg *jnegToIfEnd = new Jneg(loadSD2);
-                    Jzero *jzeroToEnd = new Jzero(loadFinalResult);
                     Jump *jumpPastSub = new Jump(stubPastSub);
 
-                    instructionList.append(lhsResolution->instructions)
-                            .append(lhsLoad)
+                    // NEGATIVE DIVISION/MODULO
+                    Sub *resetSignTemp = new Sub(primaryAccumulator);
+
+                    Load *loadSignTemp = new Load(signTemp->getAddress());
+                    Store *storeInSignTemp = new Store(signTemp->getAddress());
+                    Sub *subSignTemp = new Sub(signTemp->getAddress());
+
+                    InstructionList &negativeA = *new InstructionList();
+                    Jump *jumpBackToACode = new Jump(storeDividend);
+
+                    negativeA.append(new Stub()) // stub start for safety
+                            .append(storeInSignTemp)
+                            .append(subSignTemp)
+                            .append(subSignTemp)
+                            .append(jumpBackToACode);
+
+                    Jneg *jumpIfANegative = new Jneg(negativeA.start());
+
+                    InstructionList &negativeB = *new InstructionList();
+
+                    Load *loadSecondaryAccumulator = new Load(secondaryAccumulator);
+                    Store *storeInSecondaryAccumulator = new Store(secondaryAccumulator);
+                    Sub *subSecondaryAccumulator = new Sub(secondaryAccumulator);
+
+                    Inc *incSign = new Inc();
+                    Store *storeSign = new Store(signTemp->getAddress());
+                    Jump *jumpBackToLoad = new Jump(loadSecondaryAccumulator);
+
+                    Jzero *signNotSet = new Jzero(incSign);
+                    Jump *jumpBackToBCode = new Jump(subDividend);
+
+                    negativeB.append(new Stub()) // stub start for safety
+                            .append(rhsLoad)
+                            .append(storeInSecondaryAccumulator)
+                            .append(subSecondaryAccumulator)
+                            .append(subSecondaryAccumulator)
+                            .append(storeInSecondaryAccumulator) // basically store -b
+                            .append(loadSignTemp)
+                            .append(signNotSet) // if sign is not set, just jump to end
+                            .append(resetSignTemp) // otherwise, set it to 0
+                            .append(storeInSignTemp) // store it
+                            .append(loadSecondaryAccumulator) // load new b value before...
+                            .append(jumpBackToBCode) // ...jumping back to code
+                            .append(incSign)
+                            .append(storeSign)
+                            .append(jumpBackToLoad);
+
+                    Jneg *jumpIfBNegative = new Jneg(negativeB.start());
+
+                    // end section
+                    InstructionList &signResolutionInstructions = *new InstructionList();
+                    InstructionList &signStayed = *new InstructionList();
+                    InstructionList &signChanged = *new InstructionList();
+
+                    Load *loadSignTemp2 = new Load(signTemp->getAddress());
+
+                    if (modulo) {
+                        Load *loadRemainEnd = new Load(remain->getAddress());
+                        Jpos *negativeBModuloComplement = new Jpos(loadRemainEnd); // if b is positive, jump to this blocks end
+                        Load *loadRemainAgain = new Load(remain->getAddress());
+                        Store *storeInEACC = new Store(expressionAccumulator); // store it in eacc
+                        Sub *subEACC = new Sub(expressionAccumulator); // and sub it twice
+                        Jump *jumpPastLoadRemain = new Jump(signResolutionInstructions.end());
+
+                        signStayed.append(rhsLoad)
+                                .append(negativeBModuloComplement)
+                                .append(loadRemainAgain)
+                                .append(storeInEACC)
+                                .append(subEACC)
+                                .append(subEACC)
+                                .append(jumpPastLoadRemain)
+                                .append(loadRemainEnd);
+
+                        Add *addRemainToB = new Add(remain->getAddress());
+                        Sub *subRemainFromB2 = new Sub(remain->getAddress());
+                        Jpos *ifItWasPositive = new Jpos(subRemainFromB2);
+                        Jump *jumpToEnd = new Jump(signResolutionInstructions.end());
+
+                        signChanged.append(rhsLoad)
+                                .append(ifItWasPositive)
+                                .append(addRemainToB)
+                                .append(jumpToEnd)
+                                .append(subRemainFromB2)
+                                .append(jumpToEnd);
+                    } else {
+                        signStayed.append(loadResult);
+
+                        Load *finalLoadResult = new Load(result->getAddress());
+
+                        Load *loadResult = new Load(result->getAddress());
+                        Store *storeResult = new Store(result->getAddress());
+                        Sub *subResult = new Sub(result->getAddress());
+
+                        Load *loadRemain = new Load(remain->getAddress());
+                        Jzero *dontDecIfZero = new Jzero(finalLoadResult);
+                        Dec *decResultIfNotZero = new Dec();
+                        Jump *jumpPastLoad = new Jump(signResolutionInstructions.end());
+
+                        signChanged.append(loadResult)
+                                .append(subResult)
+                                .append(subResult)
+                                .append(storeResult)
+                                .append(loadRemain)
+                                .append(dontDecIfZero)
+                                .append(loadResult)
+                                .append(decResultIfNotZero)
+                                .append(jumpPastLoad)
+                                .append(finalLoadResult);
+                    }
+
+                    Jzero *signNotChanged = new Jzero(signStayed.start()); // jump to b modulo res if sign not changed
+
+                    signResolutionInstructions.append(loadSignTemp2)
+                            .append(signNotChanged)
+                            .append(signChanged)
+                            .append(signStayed);
+
+                    Jzero *jzeroToEnd = new Jzero(signResolutionInstructions.start());
+
+                    instructionList.append(resetSignTemp) // set sign temp to 0
+                            .append(storeInSignTemp) // store it in sign temp
+                            .append(lhsResolution->instructions)
+                            .append(lhsLoad) // load a
+                            .append(jzeroToSubEnd) // if 0, jump
+                            .append(jumpIfANegative) // if negative, jump to negative section
                             .append(storeDividend)
                             .append(storeRemain)
                             .append(sub0)
@@ -423,6 +549,7 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                             .append(rhsResolution->instructions)
                             .append(rhsLoad)
                             .append(jzeroToSubEnd)
+                            .append(jumpIfBNegative)
                             .append(storeSD)
                             .append(jumpToWhileWithoutLoad)
                             .append(loadSD)
@@ -451,9 +578,12 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                             .append(jzeroToEnd)
                             .append(storeMult3)
                             .append(jumpToIf)
-                            .append(loadFinalResult)
                             .append(jumpPastSub)
                             .append(sub0End)
+                            .append(jumpPastSub)
+                            .append(negativeA)
+                            .append(negativeB)
+                            .append(signResolutionInstructions)
                             .append(stubPastSub);
                 }
                     break;
