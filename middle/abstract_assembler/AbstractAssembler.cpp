@@ -216,15 +216,17 @@ SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, Ins
 
     Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(lhsResolution->address)) : static_cast<Instruction *>(new Load(lhsResolution->address));
     Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
-    Store *store = new Store(expressionAccumulator);
 
     if (rhsResolution->indirect) {
+        Store *store = new Store(expressionAccumulator);
         Sub *sub = new Sub(expressionAccumulator);
+
         instructions.append(rhsResolution->instructions)
                 .append(rhsLoad)
                 .append(store)
                 .append(lhsResolution->instructions)
-                .append(lhsLoad);
+                .append(lhsLoad)
+                .append(sub);
     } else {
         Sub *sub = new Sub(rhsResolution->address);
         instructions.append(lhsResolution->instructions)

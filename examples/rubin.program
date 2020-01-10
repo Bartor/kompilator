@@ -1,14 +1,9 @@
 DECLARE
-    a(0:2), b, c, d
+    a(0:2), b
 BEGIN
+    a(0) ASSIGN 1;
     b ASSIGN 0;
-    c ASSIGN 1;
-    d ASSIGN 2;
-
-    a(c) ASSIGN 21;
-    a(d) ASSIGN 37;
-
-    a(b) ASSIGN a(c) PLUS a(d);
-
-    WRITE a(b);
+    IF 1 EQ a(b) THEN
+        WRITE 0;
+    ENDIF
 END
