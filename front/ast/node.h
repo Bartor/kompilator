@@ -176,7 +176,7 @@ public:
 
 class CommandList : public Node {
 public:
-    std::vector<Command *> commands;
+    std::vector<Node *> commands;
 
     virtual std::string toString(int indentation);
 

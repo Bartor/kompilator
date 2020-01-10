@@ -2,6 +2,7 @@
 #include <fstream>
 #include "front/ast/node.h"
 #include "middle/abstract_assembler/AbstractAssembler.h"
+#include "middle/ast_optimizer/ASTOptimizer.h"
 
 extern DeclarationList *declarations;
 extern CommandList *commands;
@@ -12,8 +13,8 @@ extern int yyparse();
 extern FILE *yyin;
 
 int main(int argc, char **argv) {
-    if (argc != 2 && argc != 3) {
-        std::cerr << "Usage: compiler <source> [destination]" << std::endl;
+    if (argc < 2) {
+        std::cerr << "Usage: compiler <source> [destination] [optimize=(0|1)]" << std::endl;
         return 1;
     }
 
@@ -22,6 +23,9 @@ int main(int argc, char **argv) {
         std::cerr << "Can't open " << argv[1] << std::endl;
         return 1;
     }
+
+    bool optimize = argc < 4 ? false : atoi(argv[3]) != 0;
+    std::cout << "- Analyzing file " << argv[1] << (optimize ? " with optimization -" : " without optimization -") << std::endl;
 
     std::cout << "- Parsing -" << std::endl;
 
@@ -37,6 +41,15 @@ int main(int argc, char **argv) {
 
     std::cout << "-=- A S T -=-" << std::endl;
     std::cout << program->toString() << std::endl;
+
+    if (optimize) {
+        std::cout << "- AST Optimization -" << std::endl;
+        ASTOptimizer *astOptimizer = new ASTOptimizer(program);
+        astOptimizer->optimize();
+
+        std::cout << "-=- OPTIMIZED A S T -=-" << std::endl;
+        std::cout << program->toString() << std::endl;
+    }
 
     AbstractAssembler *assembler = new AbstractAssembler(*program);
 

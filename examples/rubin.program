@@ -1,8 +1,14 @@
 DECLARE
-    a, b(-2:2)
+    a(1:2), b, c, d
 BEGIN
-    a ASSIGN 1;
-    b(a) ASSIGN 1;
-    WRITE b(1);
-    WRITE b(a);
+    d ASSIGN 1;
+    c ASSIGN 2;
+    a(d) ASSIGN 21;
+    a(c) ASSIGN 37;
+
+    b ASSIGN a(d) PLUS a(c);
+
+    WRITE a(c);
+    WRITE a(d);
+    WRITE b;
 END
