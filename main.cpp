@@ -3,6 +3,7 @@
 #include "front/ast/node.h"
 #include "middle/abstract_assembler/AbstractAssembler.h"
 #include "middle/ast_optimizer/ASTOptimizer.h"
+#include "middle/peephole/PeepholeOptimizer.h"
 
 extern DeclarationList *declarations;
 extern CommandList *commands;
@@ -62,14 +63,34 @@ int main(int argc, char **argv) {
 
         std::ofstream output;
         output.open(argv[2] ? argv[2] : "a.out");
+
+
         for (const auto &ins : assembled.getInstructions()) {
             if (!ins->stub) {
                 std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
-                output << ins->toAssemblyCode(true) << std::endl;
+                if (!optimize) output << ins->toAssemblyCode(true) << std::endl;
+
             }
         }
 
-        output.close();
+        if (optimize) {
+            std::cout << "- ASM Optimization -" << std::endl;
+            PeepholeOptimizer *peepholeOptimizer = new PeepholeOptimizer(assembled);
+
+            peepholeOptimizer->optimize();
+            assembled.seal();
+
+            std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
+
+            for (const auto &ins : assembled.getInstructions()) {
+                if (!ins->stub) {
+                    std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
+                    output << ins->toAssemblyCode(true) << std::endl;
+                }
+            }
+            output.close();
+        }
+
     } catch (std::string errorMessage) {
         std::cout << "=!= COMPILATION ERROR =!=" << std::endl << errorMessage << std::endl;
         return 1;
