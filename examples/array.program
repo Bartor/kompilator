@@ -1,17 +1,8 @@
 DECLARE
-    tab(1:10), i, sum
+    a, tab(1:10), b
 BEGIN
-    i ASSIGN 1;
-    sum ASSIGN 0;
-    WHILE i LEQ 10 DO
-        tab(i) ASSIGN i;
-        i ASSIGN i PLUS 1;
-    ENDWHILE
-
-    i ASSIGN 1;
-    WHILE i LEQ 10 DO
-        sum ASSIGN sum PLUS tab(i);
-        i ASSIGN i PLUS 1;
-    ENDWHILE
-    WRITE sum;
+    READ a;
+    READ b;
+    a ASSIGN a MOD b;
+    WRITE a;
 END

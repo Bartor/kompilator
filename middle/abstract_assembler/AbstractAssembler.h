@@ -11,6 +11,13 @@
 #ifndef COMPILER_ABSTRACTASSEMBLER_H
 #define COMPILER_ABSTRACTASSEMBLER_H
 
+enum ResolutionType {
+    CONSTANT,
+    VARIABLE,
+    CONSTANT_ARRAY,
+    VARIABLE_ARRAY
+};
+
 class Resolution {
 public:
     bool writable;
@@ -18,9 +25,10 @@ public:
     long long temporaryVars;
     InstructionList &instructions;
     ResolvableAddress &address;
+    ResolutionType type;
 
-    Resolution(InstructionList &instructionList, ResolvableAddress &address, bool indirect, long long temporaryVars = 0, bool writable = true)
-            : instructions(instructionList), address(address), indirect(indirect), temporaryVars(temporaryVars), writable(writable) {}
+    Resolution(InstructionList &instructionList, ResolvableAddress &address, ResolutionType type, bool indirect, long long temporaryVars = 0, bool writable = true)
+            : instructions(instructionList), address(address), indirect(indirect), temporaryVars(temporaryVars), writable(writable), type(type) {}
 };
 
 class SimpleResolution {
@@ -51,7 +59,7 @@ private:
 
     SimpleResolution *assembleCondition(Condition &condition, InstructionList &codeBlock);
 
-    Resolution *assembleExpression(AbstractExpression &expression);
+    SimpleResolution *assembleExpression(AbstractExpression &expression);
 
     Resolution *resolve(AbstractValue &value);
 

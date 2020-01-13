@@ -28,7 +28,8 @@ InstructionList &AbstractAssembler::assembleConstants() {
 
 void AbstractAssembler::getVariablesFromDeclarations() {
     scopedVariables = new ScopedVariables(
-            accumulatorNumber // offset by accumulators...
+            1
+            + accumulatorNumber // offset by accumulators...
             + program.constants.constants.size() // ...constants...
             + program.declarations.declarations.size() // ...and possible constants
     );
@@ -63,22 +64,27 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
 
             if (!idRes->writable) throw "Trying to read to non-writable variable " + readNode->identifier.name;
 
-            Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
             Get *get = new Get();
+            if (idRes->indirect) {
+                TemporaryVariable *tempAddressVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                scopedVariables->pushVariableScope(tempAddressVar);
 
-            instructions.append(idRes->instructions)
-                    .append(get)
-                    .append(store);
+                instructions.append(idRes->instructions).append(new Store(tempAddressVar->getAddress())).append(get).append(new Storei(tempAddressVar->getAddress()));
+                tempVars += 1;
+            } else {
+                instructions.append(get).append(new Store(idRes->address));
+            }
 
             tempVars += idRes->temporaryVars;
         } else if (auto writeNode = dynamic_cast<Write *>(command)) { // WRITE
             Resolution *valRes = resolve(writeNode->value);
-            Instruction *load = valRes->indirect ? static_cast<Instruction *>(new Loadi(valRes->address)) : static_cast<Instruction *>(new Load(valRes->address));
             Put *put = new Put();
 
-            instructions.append(valRes->instructions)
-                    .append(load)
-                    .append(put);
+            if (valRes->indirect) {
+                instructions.append(valRes->instructions).append(new Loadi(primaryAccumulator)).append(put);
+            } else {
+                instructions.append(new Load(valRes->address)).append(put);
+            }
 
             tempVars += valRes->temporaryVars;
         } else if (auto assignNode = dynamic_cast<Assignment *>(command)) { // ASSIGN
@@ -86,18 +92,19 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
 
             if (!idRes->writable) throw "Trying to assign to non-writable variable " + assignNode->identifier.name;
 
-            Resolution *expRes = assembleExpression(assignNode->expression);
+            SimpleResolution *expRes = assembleExpression(assignNode->expression);
 
-            Instruction *store = idRes->indirect ? static_cast<Instruction *>(new Storei(idRes->address)) : static_cast<Instruction *>(new Store(idRes->address));
-            Instruction *load = expRes->indirect ? static_cast<Instruction *>(new Loadi(expRes->address)) : static_cast<Instruction *>(new Load(expRes->address));
+            if (idRes->indirect) {
+                TemporaryVariable *tempAddressVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                scopedVariables->pushVariableScope(tempAddressVar);
 
-            instructions.append(idRes->instructions)
-                    .append(expRes->instructions)
-                    .append(load)
-                    .append(store);
+                instructions.append(idRes->instructions).append(new Store(tempAddressVar->getAddress())).append(expRes->instructions).append(new Storei(tempAddressVar->getAddress()));
+                tempVars += 1;
+            } else {
+                instructions.append(expRes->instructions).append(new Store(idRes->address));
+            }
 
-            tempVars += idRes->temporaryVars;
-            tempVars += expRes->temporaryVars;
+            tempVars += idRes->temporaryVars + expRes->temporaryVars;
         } else if (auto ifNode = dynamic_cast<If *>(command)) { // IF
             SimpleResolution *codeResolution = assembleCommands(ifNode->commands); // assemble inner instructions
             SimpleResolution *conditionResolution = assembleCondition(ifNode->condition, codeResolution->instructions); // assemble condition
@@ -149,54 +156,46 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                     *new ResolvableAddress(),
                     true
             );
-
             scopedVariables->pushVariableScope(iterator); // create iterator BEFORE commands would use it
+            tempVars += 1;
 
-            TemporaryVariable *iterationStart = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-            TemporaryVariable *iterationEnd = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-
-            scopedVariables->pushVariableScope(iterationEnd);
-            scopedVariables->pushVariableScope(iterationStart);
-
-            Resolution *startRes = resolve(forNode->startValue);
+            Resolution *startRes = resolve(forNode->startValue); // resolve start and end
             Resolution *endRes = resolve(forNode->endValue);
+            tempVars += startRes->temporaryVars + endRes->temporaryVars;
 
-            Instruction *startLoad = startRes->indirect ? static_cast<Instruction *>(new Loadi(startRes->address)) : static_cast<Instruction *>(new Load(startRes->address));
-            Instruction *endLoad = endRes->indirect ? static_cast<Instruction *>(new Loadi(endRes->address)) : static_cast<Instruction *>(new Load(endRes->address));
+            ResolvableAddress *iterationEndAddress; // we will need it in comparing
 
-            Store *startStore = new Store(iterationStart->getAddress());
-            Store *endStore = new Store(iterationEnd->getAddress());
+            if (endRes->type == CONSTANT) {
+                iterationEndAddress = &endRes->address;
+            } else {
+                TemporaryVariable *iterationEnd = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                scopedVariables->pushVariableScope(iterationEnd);
+                tempVars += 1;
 
-            instructions.append(endRes->instructions)
-                    .append(endLoad)
-                    .append(endStore)
-                    .append(startRes->instructions)
-                    .append(startLoad)
-                    .append(startStore);
+                iterationEndAddress = &iterationEnd->getAddress();
+
+                instructions.append(endRes->instructions)
+                        .append(endRes->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(endRes->address)))
+                        .append(new Store(*iterationEndAddress));
+            }
 
             SimpleResolution *codeResolution = assembleCommands(forNode->commands); // assemble iterated commands
 
-            Store *storeInI = new Store(iterator->getAddress());
-            Sub *subStartEnd = new Sub(iterationEnd->getAddress());
-            Instruction *j___ = forNode->reversed ? static_cast<Instruction *>(new Jneg(codeResolution->instructions.end())) : static_cast<Instruction *>(new Jpos(codeResolution->instructions.end()));
+            InstructionList &forLoopInstructions = *new InstructionList();
+            forLoopInstructions.append(new Sub(*iterationEndAddress))
+                    .append(forNode->reversed ? static_cast<Instruction *>(new Jneg(codeResolution->instructions.end())) : static_cast<Instruction *>(new Jpos(codeResolution->instructions.end())));
 
-            Jump *jumpToSSJ = new Jump(storeInI);
+            codeResolution->instructions.append(new Load(iterator->getAddress()))
+                    .append(forNode->reversed ? static_cast<Instruction *>(new Dec()) : static_cast<Instruction *>(new Inc()))
+                    .append(new Store(iterator->getAddress()))
+                    .append(new Jump(forLoopInstructions.start()));
 
-            Load *loadI = new Load(iterator->getAddress());
-            Instruction *incDec = forNode->reversed ? static_cast<Instruction *>(new Dec()) : static_cast<Instruction *>(new Inc());
+            instructions.append(startRes->instructions) // load start instructions
+                    .append(startRes->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(startRes->address)))
+                    .append(new Store(iterator->getAddress())); // store it in the iterator
 
-            Jump *jumpToLoadIncSSJ = new Jump(loadI);
-            codeResolution->instructions.append(jumpToLoadIncSSJ);
-
-            instructions.append(jumpToSSJ)
-                    .append(loadI)
-                    .append(incDec)
-                    .append(storeInI)
-                    .append(subStartEnd)
-                    .append(j___)
+            instructions.append(forLoopInstructions)
                     .append(codeResolution->instructions);
-
-            tempVars += 3 + startRes->temporaryVars + endRes->temporaryVars; //  iterator + iterationStart + iterationEnd
         }
 
         scopedVariables->popVariableScope(tempVars);
@@ -214,23 +213,20 @@ SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, Ins
     Resolution *lhsResolution = resolve(condition.lhs);
     Resolution *rhsResolution = resolve(condition.rhs);
 
-    Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(lhsResolution->address)) : static_cast<Instruction *>(new Load(lhsResolution->address));
-    Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
-
     if (rhsResolution->indirect) {
         Store *store = new Store(expressionAccumulator);
         Sub *sub = new Sub(expressionAccumulator);
 
         instructions.append(rhsResolution->instructions)
-                .append(rhsLoad)
+                .append(rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(rhsResolution->address)))
                 .append(store)
                 .append(lhsResolution->instructions)
-                .append(lhsLoad)
+                .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
                 .append(sub);
     } else {
         Sub *sub = new Sub(rhsResolution->address);
         instructions.append(lhsResolution->instructions)
-                .append(lhsLoad)
+                .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
                 .append(sub);
     }
 
@@ -285,36 +281,44 @@ SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, Ins
     );
 }
 
-Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
+/***
+ * Creates instructions which load result of an expression into accumulator
+ * @param expression
+ * @return
+ */
+SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
     try {
         UnaryExpression &unaryExpression = dynamic_cast<UnaryExpression &>(expression);
-        return resolve(unaryExpression.value);
+        Resolution *valueResolution = resolve(unaryExpression.value);
+        if (valueResolution->indirect) {
+            valueResolution->instructions.append(new Loadi(primaryAccumulator));
+        } else {
+            valueResolution->instructions.append(new Load(valueResolution->address));
+        }
+        return new SimpleResolution(valueResolution->instructions, valueResolution->temporaryVars);
     } catch (std::bad_cast e) {
         try {
-            TemporaryVariable *temp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-            scopedVariables->pushVariableScope(temp);
-
-            long long tempVars = 1;
-
             BinaryExpression &binaryExpression = dynamic_cast<BinaryExpression &>(expression);
             InstructionList &instructionList = *new InstructionList();
+
+            long long tempVars = 0;
 
             Resolution *lhsResolution = resolve(binaryExpression.lhs);
             Resolution *rhsResolution = resolve(binaryExpression.rhs);
 
-            Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(lhsResolution->address)) : static_cast<Instruction *>(new Load(lhsResolution->address));
-            Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(rhsResolution->address)) : static_cast<Instruction *>(new Load(rhsResolution->address));
-            Store *store = new Store(expressionAccumulator);
+            Instruction *lhsLoad = lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address));
+            Instruction *rhsLoad = rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(rhsResolution->address));
 
             bool modulo = false;
             switch (binaryExpression.type) {
                 case ADDITION: {
                     if (rhsResolution->indirect) {
-                        Add *add = new Add(expressionAccumulator);
+                        Store *storeLeft = new Store(secondaryAccumulator);
+                        Add *add = new Add(secondaryAccumulator);
 
                         instructionList.append(lhsResolution->instructions)
                                 .append(lhsLoad)
-                                .append(store)
+                                .append(storeLeft)
                                 .append(rhsResolution->instructions)
                                 .append(rhsLoad)
                                 .append(add);
@@ -330,10 +334,11 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                 case SUBTRACTION: {
                     if (rhsResolution->indirect) {
                         Sub *sub = new Sub(expressionAccumulator);
+                        Store *storeRight = new Store(secondaryAccumulator);
 
                         instructionList.append(rhsResolution->instructions)
                                 .append(rhsLoad)
-                                .append(store)
+                                .append(storeRight)
                                 .append(lhsResolution->instructions)
                                 .append(lhsLoad)
                                 .append(sub);
@@ -349,405 +354,280 @@ Resolution *AbstractAssembler::assembleExpression(AbstractExpression &expression
                 case MODULO:
                     modulo = true;
                 case DIVISION: {
-                    // scaled divisor is to be kept in secondaryAccumulator
-                    // dividend is to be kept in expressionAccumulator
-                    TemporaryVariable *multiplier = temp; // result is store in temp
-
+                    TemporaryVariable *scaledDivisor = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *sign = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *divisor = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *dividend = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *multiple = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *remain = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    TemporaryVariable *result = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    TemporaryVariable *signTemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    scopedVariables->pushVariableScope(signTemp); // 0 == keep sign, !0 == change sign
+                    scopedVariables->pushVariableScope(scaledDivisor);
+                    scopedVariables->pushVariableScope(sign);
+                    scopedVariables->pushVariableScope(divisor);
+                    scopedVariables->pushVariableScope(dividend);
+                    scopedVariables->pushVariableScope(multiple);
                     scopedVariables->pushVariableScope(remain);
-                    scopedVariables->pushVariableScope(result);
+                    tempVars += 6;
 
-                    tempVars += 3; // as mult is kept in default temp for expression, we don't need to push the scope
+                    InstructionList &firstWhileBlock = *new InstructionList();
+                    firstWhileBlock.append(new Load(scaledDivisor->getAddress()))
+                            .append(new Sub(dividend->getAddress()));
 
-                    Sub *sub0 = new Sub(primaryAccumulator);
-                    Store *storeResult = new Store(result->getAddress());
-                    Inc *inc = new Inc();
-                    Store *storeMult = new Store(multiplier->getAddress());
-                    // load A
-                    Store *storeDividend = new Store(expressionAccumulator);
-                    Store *storeRemain = new Store(remain->getAddress());
-                    // load B
-                    // jzero to SUB_END
-                    Store *storeSD = new Store(secondaryAccumulator);
-                    // jump to WHILE_WITHOUT_LOAD
+                    InstructionList &doWhileBlock = *new InstructionList();
+                    doWhileBlock.append(new Load(remain->getAddress()))
+                            .append(new Sub(scaledDivisor->getAddress()));
 
-                    Load *loadSD = new Load(secondaryAccumulator); // WHILE
-                    Sub *subDividend = new Sub(expressionAccumulator); // WHILE_WITHOUT_LOAD
-                    // jzero to IF
-                    // Jpos to IF
+                    firstWhileBlock.append(new Jpos(doWhileBlock.start()))
+                            .append(new Jzero(doWhileBlock.start()))
+                            .append(new Load(scaledDivisor->getAddress()))
+                            .append(new Shift(constants->getConstant(1)->getAddress()))
+                            .append(new Store(scaledDivisor->getAddress()))
+                            .append(new Load(multiple->getAddress()))
+                            .append(new Shift(constants->getConstant(1)->getAddress()))
+                            .append(new Store(multiple->getAddress()))
+                            .append(new Jump(firstWhileBlock.start()));
 
-                    Add *addDividend = new Add(expressionAccumulator);
-                    Shift *shiftByPlusOne = new Shift(constants->getConstant(1)->getAddress());
-                    Store *storeSD2 = new Store(secondaryAccumulator);
-                    Load *loadMult = new Load(multiplier->getAddress());
-                    // shift by +1
-                    Store *storeMult2 = new Store(multiplier->getAddress());
-                    Jump *jumpToWhile = new Jump(loadSD); // JUMP TO WHILE
+                    InstructionList &afterIfBlock = *new InstructionList();
+                    afterIfBlock.append(new Load(scaledDivisor->getAddress()))
+                            .append(new Shift(constants->getConstant(-1)->getAddress()))
+                            .append(new Store(scaledDivisor->getAddress()))
+                            .append(new Load(multiple->getAddress()))
+                            .append(new Shift(constants->getConstant(-1)->getAddress()))
+                            .append(new Store(multiple->getAddress()));
 
-                    Load *loadRemain = new Load(remain->getAddress()); // IF
-                    Sub *subSD = new Sub(secondaryAccumulator);
-                    // jneg to IF_END
-                    Store *storeRemain2 = new Store(remain->getAddress());
-                    Load *loadResult = new Load(result->getAddress());
-                    Add *addMult = new Add(multiplier->getAddress());
-                    Store *storeResult2 = new Store(result->getAddress());
-
-                    Load *loadSD2 = new Load(secondaryAccumulator); // IF_END
-                    Shift *shiftByMinusOne = new Shift(constants->getConstant(-1)->getAddress());
-                    Store *storeSD3 = new Store(secondaryAccumulator);
-                    Load *loadMult2 = new Load(multiplier->getAddress());
-                    // shift by -1
-                    // jzero END
-                    Store *storeMult3 = new Store(multiplier->getAddress());
-                    Jump *jumpToIf = new Jump(loadRemain); // jump to IF
-
-                    // jump past sub
-                    Sub *sub0End = new Sub(primaryAccumulator);
-                    Stub *stubPastSub = new Stub();
-
-                    //missing jumps
-                    Jzero *jzeroToSubEnd = new Jzero(sub0End);
-                    Jump *jumpToWhileWithoutLoad = new Jump(subDividend);
-                    Jzero *jzeroToIf = new Jzero(loadRemain);
-                    //jzero to end after signResolution
-                    Jpos *jposToIf = new Jpos(loadRemain);
-                    Jneg *jnegToIfEnd = new Jneg(loadSD2);
-                    Jump *jumpPastSub = new Jump(stubPastSub);
-
-                    // NEGATIVE DIVISION/MODULO
-                    Sub *resetSignTemp = new Sub(primaryAccumulator);
-
-                    Load *loadSignTemp = new Load(signTemp->getAddress());
-                    Store *storeInSignTemp = new Store(signTemp->getAddress());
-                    Sub *subSignTemp = new Sub(signTemp->getAddress());
-
-                    InstructionList &negativeA = *new InstructionList();
-                    Jump *jumpBackToACode = new Jump(storeDividend);
-
-                    negativeA.append(new Stub()) // stub start for safety
-                            .append(storeInSignTemp)
-                            .append(subSignTemp)
-                            .append(subSignTemp)
-                            .append(jumpBackToACode);
-
-                    Jneg *jumpIfANegative = new Jneg(negativeA.start());
-
-                    InstructionList &negativeB = *new InstructionList();
-
-                    Load *loadSecondaryAccumulator = new Load(secondaryAccumulator);
-                    Store *storeInSecondaryAccumulator = new Store(secondaryAccumulator);
-                    Sub *subSecondaryAccumulator = new Sub(secondaryAccumulator);
-
-                    Inc *incSign = new Inc();
-                    Store *storeSign = new Store(signTemp->getAddress());
-                    Jump *jumpBackToLoad = new Jump(loadSecondaryAccumulator);
-
-                    Jzero *signNotSet = new Jzero(incSign);
-                    Jump *jumpBackToBCode = new Jump(subDividend);
-
-                    negativeB.append(new Stub()) // stub start for safety
-                            .append(rhsLoad)
-                            .append(storeInSecondaryAccumulator)
-                            .append(subSecondaryAccumulator)
-                            .append(subSecondaryAccumulator)
-                            .append(storeInSecondaryAccumulator) // basically store -b
-                            .append(loadSignTemp)
-                            .append(signNotSet) // if sign is not set, just jump to end
-                            .append(resetSignTemp) // otherwise, set it to 0
-                            .append(storeInSignTemp) // store it
-                            .append(loadSecondaryAccumulator) // load new b value before...
-                            .append(jumpBackToBCode) // ...jumping back to code
-                            .append(incSign)
-                            .append(storeSign)
-                            .append(jumpBackToLoad);
-
-                    Jneg *jumpIfBNegative = new Jneg(negativeB.start());
-
-                    // end section
-                    InstructionList &signResolutionInstructions = *new InstructionList();
-                    InstructionList &signStayed = *new InstructionList();
-                    InstructionList &signChanged = *new InstructionList();
-
-                    Load *loadSignTemp2 = new Load(signTemp->getAddress());
-
+                    InstructionList &loadResultBlock = *new InstructionList();
                     if (modulo) {
-                        Load *loadRemainEnd = new Load(remain->getAddress());
-                        Jpos *negativeBModuloComplement = new Jpos(loadRemainEnd); // if b is positive, jump to this blocks end
-                        Load *loadRemainAgain = new Load(remain->getAddress());
-                        Store *storeInEACC = new Store(expressionAccumulator); // store it in eacc
-                        Sub *subEACC = new Sub(expressionAccumulator); // and sub it twice
-                        Jump *jumpPastLoadRemain = new Jump(signResolutionInstructions.end());
+                        loadResultBlock.append(new Load(sign->getAddress()));
 
-                        signStayed.append(rhsLoad)
-                                .append(negativeBModuloComplement)
-                                .append(loadRemainAgain)
-                                .append(storeInEACC)
-                                .append(subEACC)
-                                .append(subEACC)
-                                .append(jumpPastLoadRemain)
-                                .append(loadRemainEnd);
+                        InstructionList &negativeSignBlock = *new InstructionList();
+                        negativeSignBlock.append(new Load(divisor->getAddress()));
 
-                        Add *addRemainToB = new Add(remain->getAddress());
-                        Sub *subRemainFromB2 = new Sub(remain->getAddress());
-                        Jpos *ifItWasPositive = new Jpos(subRemainFromB2);
-                        Jump *jumpToEnd = new Jump(signResolutionInstructions.end());
+                        InstructionList &aNegative = *new InstructionList();
+                        aNegative.append(new Sub(remain->getAddress()))
+                                .append(new Jump(loadResultBlock.end()));
 
-                        signChanged.append(rhsLoad)
-                                .append(ifItWasPositive)
-                                .append(addRemainToB)
-                                .append(jumpToEnd)
-                                .append(subRemainFromB2)
-                                .append(jumpToEnd);
-                    } else {
-                        signStayed.append(loadResult);
+                        InstructionList &bNegative = *new InstructionList();
+                        bNegative.append(new Add(remain->getAddress()))
+                                .append(new Jump(loadResultBlock.end()));
 
-                        Load *finalLoadResult = new Load(result->getAddress());
+                        negativeSignBlock.append(new Jpos(bNegative.end()))
+                                .append(bNegative)
+                                .append(aNegative);
 
-                        Load *loadResult = new Load(result->getAddress());
-                        Store *storeResult = new Store(result->getAddress());
-                        Sub *subResult = new Sub(result->getAddress());
+                        InstructionList &positiveSignBlock = *new InstructionList();
+                        positiveSignBlock.append(new Load(divisor->getAddress()));
 
-                        Load *loadRemain = new Load(remain->getAddress());
-                        Jzero *dontDecIfZero = new Jzero(finalLoadResult);
-                        Dec *decResultIfNotZero = new Dec();
-                        Jump *jumpPastLoad = new Jump(signResolutionInstructions.end());
+                        InstructionList &bothNegativeBlock = *new InstructionList();
+                        bothNegativeBlock.append(new Sub(primaryAccumulator))
+                                .append(new Sub(remain->getAddress()))
+                                .append(new Jump(loadResultBlock.end()));
 
-                        signChanged.append(loadResult)
-                                .append(subResult)
-                                .append(subResult)
-                                .append(storeResult)
-                                .append(loadRemain)
-                                .append(dontDecIfZero)
-                                .append(loadResult)
-                                .append(decResultIfNotZero)
-                                .append(jumpPastLoad)
-                                .append(finalLoadResult);
+                        InstructionList &bothPositiveBlock = *new InstructionList();
+                        bothPositiveBlock.append(new Load(remain->getAddress()))
+                                .append(new Jump(loadResultBlock.end()));
+
+                        positiveSignBlock.append(new Jpos(bothPositiveBlock.start()))
+                                .append(bothNegativeBlock)
+                                .append(bothPositiveBlock);
+
+                        loadResultBlock.append(new Jzero(negativeSignBlock.end()))
+                                .append(negativeSignBlock)
+                                .append(positiveSignBlock);
                     }
 
-                    Jzero *signNotChanged = new Jzero(signStayed.start()); // jump to b modulo res if sign not changed
+                    afterIfBlock.append(new Jzero(loadResultBlock.start()));
+                    doWhileBlock.append(new Jneg(afterIfBlock.start()));
 
-                    signResolutionInstructions.append(loadSignTemp2)
-                            .append(signNotChanged)
-                            .append(signChanged)
-                            .append(signStayed);
+                    InstructionList &ifBlock = *new InstructionList();
+                    ifBlock.append(new Store(remain->getAddress()))
+                            .append(new Load(expressionAccumulator))
+                            .append(new Add(multiple->getAddress()))
+                            .append(new Store(expressionAccumulator));
 
-                    Jzero *jzeroToEnd = new Jzero(signResolutionInstructions.start());
+                    doWhileBlock.append(ifBlock)
+                            .append(afterIfBlock)
+                            .append(new Jump(doWhileBlock.start()));
 
-                    instructionList.append(resetSignTemp) // set sign temp to 0
-                            .append(storeInSignTemp) // store it in sign temp
+                    InstructionList &initBlock = *new InstructionList();
+                    initBlock.append(new Sub(primaryAccumulator))
+                            .append(new Store(remain->getAddress()))
+                            .append(new Store(sign->getAddress()))
+                            .append(new Inc())
+                            .append(new Store(multiple->getAddress()))
                             .append(lhsResolution->instructions)
-                            .append(lhsLoad) // load a
-                            .append(jzeroToSubEnd) // if 0, jump
-                            .append(jumpIfANegative) // if negative, jump to negative section
-                            .append(storeDividend)
-                            .append(storeRemain)
-                            .append(sub0)
-                            .append(storeResult)
-                            .append(inc)
-                            .append(storeMult)
+                            .append(lhsLoad)
+                            .append(new Store(sign->getAddress()));
+
+                    InstructionList &negativeABlock = *new InstructionList();
+                    if (lhsResolution->indirect) {
+                        negativeABlock.append(new Store(expressionAccumulator))
+                                .append(new Sub(expressionAccumulator))
+                                .append(new Sub(expressionAccumulator));
+                    } else {
+                        negativeABlock.append(new Sub(lhsResolution->address))
+                                .append(new Sub(lhsResolution->address));
+                    }
+
+                    initBlock.append(new Jpos(negativeABlock.end()))
+                            .append(negativeABlock)
+                            .append(new Store(dividend->getAddress()))
+                            .append(new Store(remain->getAddress()))
                             .append(rhsResolution->instructions)
                             .append(rhsLoad)
-                            .append(jzeroToSubEnd)
-                            .append(jumpIfBNegative)
-                            .append(storeSD)
-                            .append(jumpToWhileWithoutLoad)
-                            .append(loadSD)
-                            .append(subDividend)
-                            .append(jzeroToIf)
-                            .append(jposToIf)
-                            .append(addDividend)
-                            .append(shiftByPlusOne)
-                            .append(storeSD2)
-                            .append(loadMult)
-                            .append(shiftByPlusOne)
-                            .append(storeMult2)
-                            .append(jumpToWhile)
-                            .append(loadRemain)
-                            .append(subSD)
-                            .append(jnegToIfEnd)
-                            .append(storeRemain2)
-                            .append(loadResult)
-                            .append(addMult)
-                            .append(storeResult2)
-                            .append(loadSD2)
-                            .append(shiftByMinusOne)
-                            .append(storeSD3)
-                            .append(loadMult2)
-                            .append(shiftByMinusOne)
-                            .append(jzeroToEnd)
-                            .append(storeMult3)
-                            .append(jumpToIf)
-                            .append(jumpPastSub)
-                            .append(sub0End)
-                            .append(jumpPastSub)
-                            .append(negativeA)
-                            .append(negativeB)
-                            .append(signResolutionInstructions)
-                            .append(stubPastSub);
+                            .append(new Store(divisor->getAddress())); // store divisor in original form
+
+                    InstructionList &negativeBBlock = *new InstructionList();
+                    if (rhsResolution->indirect) {
+                        negativeBBlock.append(new Store(expressionAccumulator))
+                                .append(new Sub(expressionAccumulator))
+                                .append(new Sub(expressionAccumulator));
+                    } else {
+                        negativeBBlock.append(new Sub(rhsResolution->address))
+                                .append(new Sub(rhsResolution->address));
+                    }
+
+                    InstructionList &eraseSign = *new InstructionList();
+                    eraseSign.append(new Sub(primaryAccumulator))
+                            .append(new Store(sign->getAddress()))
+                            .append(new Jump(firstWhileBlock.start()));
+
+                    negativeBBlock.append(new Store(scaledDivisor->getAddress()))
+                            .append(new Load(sign->getAddress()))
+                            .append(new Jpos(eraseSign.end()))
+                            .append(eraseSign)
+                            .append(new Inc())
+                            .append(new Store(sign->getAddress()))
+                            .append(new Jump(firstWhileBlock.start()));
+
+                    initBlock.append(new Jpos(negativeBBlock.end()))
+                            .append(negativeBBlock)
+                            .append(new Store(scaledDivisor->getAddress()))
+                            .append(new Load(sign->getAddress()));
+
+                    InstructionList &toggleSignForPositiveBlock = *new InstructionList();
+                    toggleSignForPositiveBlock.append(new Sub(primaryAccumulator))
+                            .append(new Store(sign->getAddress()))
+                            .append(new Jump(firstWhileBlock.start()));
+
+                    initBlock.append(new Jneg(toggleSignForPositiveBlock.end()))
+                            .append(toggleSignForPositiveBlock)
+                            .append(new Jump(firstWhileBlock.start()));
+
+                    instructionList.append(initBlock)
+                            .append(firstWhileBlock)
+                            .append(doWhileBlock)
+                            .append(loadResultBlock);
                 }
                     break;
                 case MULTIPLICATION: { // A * B
-                    // A and B are modified and must be copied before...
-                    ResolvableAddress &aAddr = temp->getAddress();
-                    ResolvableAddress &bAddr = expressionAccumulator;
-                    Store *storeA = new Store(temp->getAddress()); // ... a into temporary
-                    Store *storeB = store;
+                    TemporaryVariable *negativeATemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *negativeBTemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    scopedVariables->pushVariableScope(negativeATemp);
+                    scopedVariables->pushVariableScope(negativeBTemp);
 
-                    TemporaryVariable *negativeOperationTemporary = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    scopedVariables->pushVariableScope(negativeOperationTemporary);
+                    TemporaryVariable *copiedA = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *copiedB = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    scopedVariables->pushVariableScope(copiedA);
+                    scopedVariables->pushVariableScope(copiedB);
+                    tempVars += 4;
 
-                    tempVars += 1;
+                    Resolution *aResolution = resolve(binaryExpression.lhs);
+                    Resolution *bResolution = resolve(binaryExpression.rhs);
 
-                    Sub *accumulatorReset = new Sub(primaryAccumulator);
-                    Store *storeStartResult = new Store(secondaryAccumulator); // result is in secondary accumulator
-                    Load *loadA = new Load(aAddr);
-                    // jzero to loadResult
-                    Shift *shiftMinusOne = new Shift(constants->getConstant(-1)->getAddress());
-                    Shift *shiftPlusOne = new Shift(constants->getConstant(1)->getAddress());
-                    Sub *subA = new Sub(aAddr);
-                    // JZERO [LOAD A]2
-                    Load *loadResult = new Load(secondaryAccumulator);
-                    Add *addB = new Add(bAddr);
-                    Store *storeResult = new Store(secondaryAccumulator);
-                    Load *loadA2 = new Load(aAddr);
-                    // SHIFT -1
-                    Store *storeA2 = new Store(aAddr);
-                    Load *loadB = new Load(bAddr);
-                    // SHIFT 1
-                    Store *storeB2 = new Store(bAddr);
-                    Jump *jumpToLoadA = new Jump(loadA);
-                    Load *loadResult2 = new Load(secondaryAccumulator);
+                    InstructionList &loadResultBlock = *new InstructionList();
+                    loadResultBlock.append(new Load(expressionAccumulator));
 
-                    Stub *stubEnd = new Stub();
+                    InstructionList &whileBlock = *new InstructionList();
+                    whileBlock.append(new Load(copiedA->getAddress()))
+                            .append(new Jzero(whileBlock.end()))
+                            .append(new Shift(constants->getConstant(-1)->getAddress()))
+                            .append(new Shift(constants->getConstant(1)->getAddress()))
+                            .append(new Sub(copiedA->getAddress()));
 
-                    Jzero *jzeroToLoadLoadA2 = new Jzero(loadA2);
-                    Jzero *jzeroToLoadResult2 = new Jzero(loadResult2);
-                    Jump *jumpToStubEnd = new Jump(stubEnd);
+                    InstructionList &afterIfBlock = *new InstructionList();
+                    afterIfBlock.append(new Load(copiedA->getAddress()))
+                            .append(new Shift(constants->getConstant(-1)->getAddress()))
+                            .append(new Store(copiedA->getAddress()))
+                            .append(new Load(copiedB->getAddress()))
+                            .append(new Shift(constants->getConstant(1)->getAddress()))
+                            .append(new Store(copiedB->getAddress()))
+                            .append(new Jump(whileBlock.start()));
 
-                    // NEGATIVE NUMBERS: when b is negative, this algorithm works
-                    // if (b < 0) { if (a < 0) { a = -a; b = -b } } else if (a < 0) { [b, a] = [a, b] }
+                    whileBlock.append(new Jzero(afterIfBlock.start()));
 
-                    Sub *subNegativeOp = new Sub(negativeOperationTemporary->getAddress()); // subtract b TWO TIMES
-                    Store *storeNegatedB = new Store(bAddr); // store negated b in bAddr aka eacc
-                    Store *storeNegatedA = new Store(aAddr); // store negated a in aAddr aka temp
+                    InstructionList &ifBlock = *new InstructionList();
+                    ifBlock.append(new Load(expressionAccumulator))
+                            .append(new Add(copiedB->getAddress()))
+                            .append(new Store(expressionAccumulator));
 
-                    InstructionList &bNegation = *new InstructionList();
-                    InstructionList &aNegation = *new InstructionList();
+                    whileBlock.append(ifBlock)
+                            .append(afterIfBlock);
 
-                    if (rhsResolution->indirect) {
-                        Store *storeBInTemp = new Store(negativeOperationTemporary->getAddress()); // store b val in temp for negatives
+                    InstructionList &initBlock = *new InstructionList();
+                    initBlock.append(new Sub(primaryAccumulator))
+                            .append(new Store(expressionAccumulator))
+                            .append(aResolution->instructions)
+                            .append(aResolution->indirect ? static_cast<Instruction * >(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(aResolution->address)))
+                            .append(new Jzero(loadResultBlock.start()));
 
-                        bNegation.append(rhsResolution->instructions)
-                                .append(storeBInTemp)
-                                .append(subNegativeOp)
-                                .append(subNegativeOp);
+                    InstructionList &aLessThanZeroBlock = *new InstructionList();
+                    aLessThanZeroBlock.append(new Store(negativeATemp->getAddress()))
+                            .append(bResolution->instructions)
+                            .append(bResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(bResolution->address)))
+                            .append(new Jzero(loadResultBlock.start()));
+
+                    InstructionList &aAndBLessThanZeroBlock = *new InstructionList();
+                    if (bResolution->indirect) {
+                        aAndBLessThanZeroBlock.append(new Store(negativeBTemp->getAddress()))
+                                .append(new Sub(negativeBTemp->getAddress()))
+                                .append(new Sub(negativeBTemp->getAddress()))
+                                .append(new Store(copiedB->getAddress()));
                     } else {
-                        Sub *subNegatedDirectB = new Sub(rhsResolution->address);
-
-                        bNegation.append(new Sub(primaryAccumulator))
-                                .append(subNegatedDirectB);
+                        aAndBLessThanZeroBlock.append(new Sub(bResolution->address))
+                                .append(new Sub(bResolution->address))
+                                .append(new Store(copiedB->getAddress()));
                     }
-                    bNegation.append(storeNegatedB);
+                    aAndBLessThanZeroBlock.append(new Sub(primaryAccumulator))
+                            .append(new Sub(negativeATemp->getAddress()))
+                            .append(new Store(copiedA->getAddress()))
+                            .append(new Jump(whileBlock.start()));
 
-                    if (lhsResolution->indirect) {
-                        Store *storeAInTemp = new Store(negativeOperationTemporary->getAddress());
+                    aLessThanZeroBlock.append(new Jneg(aAndBLessThanZeroBlock.start()))
+                            .append(new Store(copiedA->getAddress()))
+                            .append(new Load(negativeATemp->getAddress()))
+                            .append(new Store(copiedB->getAddress()))
+                            .append(new Jump(whileBlock.start()));
 
-                        aNegation.append(lhsResolution->instructions)
-                                .append(storeAInTemp)
-                                .append(subNegativeOp)
-                                .append(subNegativeOp)
-                                .append(storeNegatedA);
-                    } else {
-                        Sub *subNegatedDirectA = new Sub(lhsResolution->address);
+                    Resolution *newBResolution = resolve(binaryExpression.rhs);
+                    initBlock.append(new Jneg(aLessThanZeroBlock.start()))
+                            .append(new Store(copiedA->getAddress()))
+                            .append(newBResolution->instructions)
+                            .append(newBResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(newBResolution->address)))
+                            .append(new Jzero(loadResultBlock.start()))
+                            .append(new Store(copiedB->getAddress()))
+                            .append(new Jump(whileBlock.start()))
+                            .append(aLessThanZeroBlock)
+                            .append(aAndBLessThanZeroBlock);
 
-                        aNegation.append(new Sub(primaryAccumulator))
-                                .append(subNegatedDirectA);
-                    }
-                    aNegation.append(storeNegatedA);
-
-                    Jump *jumpBackToAlgorithm = new Jump(loadA);
-
-                    InstructionList &switchAB = *new InstructionList();
-
-                    Store *storeAInTemp = new Store(negativeOperationTemporary->getAddress());
-                    // load b
-                    Store *storeBInA = new Store(aAddr);
-                    Load *loadAFromTemp = new Load(negativeOperationTemporary->getAddress());
-                    Store *storeAInB = new Store(bAddr);
-
-                    switchAB.append(storeAInTemp)
-                            .append(loadB)
-                            .append(storeBInA)
-                            .append(loadAFromTemp)
-                            .append(storeAInB);
-
-                    Stub *stubStartOfNegs = new Stub();
-                    Jneg *jumpIfBNegative = new Jneg(stubStartOfNegs); // jump to special neg loadings
-                    Jpos *jposBackToAlgorithm = new Jpos(storeA);
-                    Jneg *jnegToSwitchAB = new Jneg(switchAB.start());
-
-                    instructionList.append(accumulatorReset) // rest acc
-                            .append(storeStartResult) // store 0 in result
-                            .append(rhsResolution->instructions)
-                            .append(rhsLoad)
-                            .append(jzeroToLoadResult2) // jump to end if 0
-                            .append(jumpIfBNegative) // jump to special neg loadings
-                            .append(storeB) // store b in eacc
-                            .append(lhsResolution->instructions)
-                            .append(lhsLoad)
-                            .append(jzeroToLoadResult2) // jump to end if 0
-                            .append(storeA) // store a in temp
-                            .append(jnegToSwitchAB) // b > 0, a < 0, switch them
-                            .append(loadA)
-                            .append(jzeroToLoadResult2)
-                            .append(shiftMinusOne)
-                            .append(shiftPlusOne)
-                            .append(subA)
-                            .append(jzeroToLoadLoadA2)
-                            .append(loadResult)
-                            .append(addB)
-                            .append(storeResult)
-                            .append(loadA2)
-                            .append(shiftMinusOne)
-                            .append(storeA2)
-                            .append(loadB)
-                            .append(shiftPlusOne)
-                            .append(storeB2)
-                            .append(jumpToLoadA)
-                            .append(loadResult2)
-                            .append(jumpToStubEnd) // jump to end after loading result
-                                    /* NEGATIVE MULTIPLICATION AREA */
-                            .append(stubStartOfNegs)
-                            .append(storeB)
-                            .append(lhsResolution->instructions)
-                            .append(lhsLoad)
-                            .append(jposBackToAlgorithm) // a > 0, b < 0, back to algo
-                            .append(bNegation) // a < 0, b < 0, negate both
-                            .append(aNegation)
-                            .append(jumpBackToAlgorithm) // back to algo
-                            .append(switchAB) // a < 0, b > 0 swtich them
-                            .append(jumpBackToAlgorithm) // back to algo
-                            .append(stubEnd);
+                    instructionList.append(initBlock)
+                            .append(whileBlock)
+                            .append(loadResultBlock);
                 }
                     break;
             }
 
-            Store *resultStore = new Store(temp->getAddress());
-            instructionList.append(resultStore);
-
-            return new Resolution(
+            return new SimpleResolution(
                     instructionList,
-                    temp->getAddress(),
-                    false,
                     tempVars + lhsResolution->temporaryVars + rhsResolution->temporaryVars
             );
         } catch (std::bad_cast ee) {}
     }
 }
 
+/***
+ * Resolves addresses of variables
+ * @param identifier
+ * @return
+ */
 Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
     Variable *var = scopedVariables->resolveVariable(identifier.name);
 
@@ -755,6 +635,7 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
         return new Resolution(
                 *new InstructionList(),
                 numVar->getAddress(),
+                VARIABLE,
                 false,
                 0, // zero temp vars used
                 !numVar->readOnly // if it's readOnly, it's not writable -- used for iterators
@@ -773,14 +654,12 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
             return new Resolution(
                     *new InstructionList(),
                     address,
+                    CONSTANT_ARRAY,
                     false
             );
         } catch (std::bad_cast _) {
             try { // VARIABLE ACCESS VALUE - a[b]
                 VariableAccessIdentifier &varAccId = dynamic_cast<VariableAccessIdentifier &>(identifier);
-
-                TemporaryVariable *tempVar = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                scopedVariables->pushVariableScope(tempVar);
 
                 ResolvableAddress &startValueAddress = constants->getConstant(arrayVar->start)->getAddress(); // arr start
                 Variable *variable = scopedVariables->resolveVariable(varAccId.accessName); // "b" variable
@@ -791,24 +670,25 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
                 Load *load = new Load(variable->getAddress()); // load value of b
                 Sub *sub = new Sub(startValueAddress); // subtract value of starting index
                 Add *add = new Add(arrAddressAddress); // add value of array address
-                Store *store = new Store(tempVar->getAddress()); // store indirect address in new variable
 
                 instructionList.append(load)
                         .append(sub)
-                        .append(add)
-                        .append(store);
+                        .append(add);
 
                 return new Resolution(
                         instructionList,
-                        tempVar->getAddress(),
-                        true,
-                        1
+                        *new ResolvableAddress(),
+                        VARIABLE_ARRAY,
+                        true
                 );
             } catch (std::bad_cast _) {}
         }
     } else throw "Variable resolution error";
 }
 
+/**
+ * Resolve address of a value
+ */
 Resolution *AbstractAssembler::resolve(AbstractValue &value) {
     try { // NUMBER VALUE - 0
         NumberValue &numberValue = dynamic_cast<NumberValue &>(value);
@@ -816,6 +696,7 @@ Resolution *AbstractAssembler::resolve(AbstractValue &value) {
         return new Resolution(
                 *new InstructionList(),
                 address,
+                CONSTANT,
                 false,
                 0
         );

@@ -1,9 +1,12 @@
 DECLARE
-    a(0:2), b
+    b, c, d, a(-3:2), e
 BEGIN
-    a(0) ASSIGN 1;
-    b ASSIGN 0;
-    IF 1 EQ a(b) THEN
-        WRITE 0;
-    ENDIF
+    c ASSIGN -3;
+    d ASSIGN -7;
+    b ASSIGN 1;
+    e ASSIGN 2;
+    a(b) ASSIGN c;
+    a(e) ASSIGN d;
+    a(0) ASSIGN a(b) TIMES a(e);
+    WRITE a(0);
 END
