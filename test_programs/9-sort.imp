@@ -32,7 +32,7 @@ BEGIN
 		ENDWHILE
 		tab(k)  ASSIGN  x;
 	ENDFOR
-	WRITE 0;
+	WRITE 11111111;
 	FOR i FROM a TO b DO
 		WRITE tab(i);
 	ENDFOR

@@ -368,6 +368,9 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                     scopedVariables->pushVariableScope(remain);
                     tempVars += 6;
 
+                    InstructionList &zeroResultBlock = *new InstructionList();
+                    zeroResultBlock.append(new Sub(primaryAccumulator));
+
                     InstructionList &firstWhileBlock = *new InstructionList();
                     firstWhileBlock.append(new Load(scaledDivisor->getAddress()))
                             .append(new Sub(dividend->getAddress()));
@@ -403,11 +406,11 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
 
                         InstructionList &aNegative = *new InstructionList();
                         aNegative.append(new Sub(remain->getAddress()))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         InstructionList &bNegative = *new InstructionList();
                         bNegative.append(new Add(remain->getAddress()))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         negativeSignBlock.append(new Jpos(bNegative.end()))
                                 .append(bNegative)
@@ -419,11 +422,11 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                         InstructionList &bothNegativeBlock = *new InstructionList();
                         bothNegativeBlock.append(new Sub(primaryAccumulator))
                                 .append(new Sub(remain->getAddress()))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         InstructionList &bothPositiveBlock = *new InstructionList();
                         bothPositiveBlock.append(new Load(remain->getAddress()))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         positiveSignBlock.append(new Jpos(bothPositiveBlock.start()))
                                 .append(bothNegativeBlock)
@@ -442,18 +445,18 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                         remainBlock.append(new Sub(primaryAccumulator))
                                 .append(new Sub(expressionAccumulator))
                                 .append(new Dec())
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         negativeResultBlock.append(new Jzero(remainBlock.end()))
                                 .append(remainBlock)
                                 .append(new Sub(primaryAccumulator))
                                 .append(new Sub(expressionAccumulator))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
 
                         loadResultBlock.append(new Jzero(negativeResultBlock.end()))
                                 .append(negativeResultBlock)
                                 .append(new Load(expressionAccumulator))
-                                .append(new Jump(loadResultBlock.end()));
+                                .append(new Jump(zeroResultBlock.end()));
                     }
 
                     afterIfBlock.append(new Jzero(loadResultBlock.start()));
@@ -477,6 +480,7 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                             .append(new Store(multiple->getAddress()))
                             .append(lhsResolution->instructions)
                             .append(lhsLoad)
+                            .append(new Jzero(zeroResultBlock.start()))
                             .append(new Store(sign->getAddress()));
 
                     InstructionList &negativeABlock = *new InstructionList();
@@ -495,6 +499,7 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                             .append(new Store(remain->getAddress()))
                             .append(rhsResolution->instructions)
                             .append(rhsLoad)
+                            .append(new Jzero(zeroResultBlock.start()))
                             .append(new Store(divisor->getAddress())); // store divisor in original form
 
                     InstructionList &negativeBBlock = *new InstructionList();
@@ -543,7 +548,8 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                     instructionList.append(initBlock)
                             .append(firstWhileBlock)
                             .append(doWhileBlock)
-                            .append(loadResultBlock);
+                            .append(loadResultBlock)
+                            .append(zeroResultBlock);
                 }
                     break;
                 case MULTIPLICATION: { // A * B
