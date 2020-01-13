@@ -1,8 +1,12 @@
 DECLARE
-    a, tab(1:10), b
+    a, b, res
 BEGIN
     READ a;
     READ b;
-    a ASSIGN a MOD b;
-    WRITE a;
+    res ASSIGN a MOD b;
+    WRITE res;
+    res ASSIGN a TIMES b;
+    WRITE res;
+    res ASSIGN a DIV b;
+    WRITE res;
 END
