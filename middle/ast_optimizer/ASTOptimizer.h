@@ -10,9 +10,9 @@ class ASTOptimizer {
 private:
     Program *originalProgram;
 
-    void traverse(Node *node, Callback callback);
+    bool traverse(Node *node, Callback callback);
 
-    void traverse(CommandList &commandList, Callback callback);
+    bool traverse(CommandList &commandList, Callback callback);
 
     Node *constantExpressionOptimizer(Node *node);
 

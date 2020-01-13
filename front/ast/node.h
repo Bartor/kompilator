@@ -317,7 +317,7 @@ public:
 
     virtual Node *copy(Callback replacer) {
         return replacer(new For(variableName, *static_cast<AbstractValue *>(startValue.copy(replacer)), *static_cast<AbstractValue *>(endValue.copy(replacer)),
-                                *static_cast<CommandList *>(commands.copy(replacer))));
+                                *static_cast<CommandList *>(commands.copy(replacer)), reversed));
     }
 
     For(std::string &variableName, AbstractValue &startValue, AbstractValue &endValue,

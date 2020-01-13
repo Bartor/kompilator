@@ -1,23 +1,31 @@
 #include "ASTOptimizer.h"
 
-void ASTOptimizer::traverse(CommandList &commandList, Callback callback) {
+bool ASTOptimizer::traverse(CommandList &commandList, Callback callback) {
+    bool changed = false;
     for (int i = 0; i < commandList.commands.size(); i++) {
-        commandList.commands[i] = callback(commandList.commands[i]);
+        Node *newNode = callback(commandList.commands[i]);
+        if (newNode != commandList.commands[i]) {
+            commandList.commands[i] = newNode;
+            changed = true;
+        }
         traverse(commandList.commands[i], callback);
     }
+    return changed;
 }
 
-void ASTOptimizer::traverse(Node *node, Callback callback) {
-    if (auto whileNode = dynamic_cast<While *>(node)) {
-        traverse(whileNode->commands, callback);
+bool ASTOptimizer::traverse(Node *node, Callback callback) {
+    if (auto cmdList = dynamic_cast<CommandList *>(node)) {
+        return traverse(*cmdList, callback);
+    } else if (auto whileNode = dynamic_cast<While *>(node)) {
+        return traverse(whileNode->commands, callback);
     } else if (auto forNode = dynamic_cast<For *>(node)) {
-        traverse(forNode->commands, callback);
+        return traverse(forNode->commands, callback);
     } else if (auto ifNode = dynamic_cast<If *>(node)) {
-        traverse(ifNode->commands, callback);
+        return traverse(ifNode->commands, callback);
     } else if (auto ifElse = dynamic_cast<IfElse *>(node)) {
-        traverse(ifElse->commands, callback);
-        traverse(ifElse->elseCommands, callback);
+        return traverse(ifElse->commands, callback) || traverse(ifElse->elseCommands, callback);
     }
+    return false;
 }
 
 Node *ASTOptimizer::constantExpressionOptimizer(Node *node) {
@@ -67,19 +75,24 @@ Node *ASTOptimizer::constantLoopUnroller(Node *node) {
             try {
                 auto endConstant = dynamic_cast<NumberValue &>(forNode->endValue);
 
-                long long iterationStart = forNode->reversed ? endConstant.value : startConstant.value;
-                long long iterationEnd = forNode->reversed ? startConstant.value : endConstant.value;
-
                 CommandList *cmdList = new CommandList();
 
-                for (long long i = iterationStart; forNode->reversed ? i >= iterationEnd : i <= iterationEnd; forNode->reversed ? i-- : i++) {
-                    Callback replacer = iteratorReplacer(forNode->variableName, i);
-                    originalProgram->constants.constants.push_back(i);
-                    CommandList *forCommands = static_cast<CommandList *>(forNode->commands.copy(replacer));
-                    cmdList->append(*forCommands);
+                if (forNode->reversed) {
+                    for (long long i = startConstant.value; i >= endConstant.value; i--) {
+                        std::cout << i << std::endl;
+                        Callback replacer = iteratorReplacer(forNode->variableName, i);
+                        originalProgram->constants.constants.push_back(i);
+                        cmdList->append(*static_cast<CommandList *>(forNode->commands.copy(replacer)));
+                    }
+                } else {
+                    for (long long i = startConstant.value; i <= endConstant.value; i++) {
+                        std::cout << i << std::endl;
+                        Callback replacer = iteratorReplacer(forNode->variableName, i);
+                        originalProgram->constants.constants.push_back(i);
+                        cmdList->append(*static_cast<CommandList *>(forNode->commands.copy(replacer)));
+                    }
                 }
 
-                std::cout << "generated new commandlist" << std::endl << cmdList->toString(0) << std::endl;
                 return cmdList;
             } catch (std::bad_cast _) {}
         } catch (std::bad_cast _) {}
@@ -111,6 +124,10 @@ Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long lon
 }
 
 void ASTOptimizer::optimize() {
-    traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantExpressionOptimizer(node); });
-    traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); });
+    while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); })) {
+        std::cout << "Unrolling constant loops" << std::endl;
+    }
+    while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantExpressionOptimizer(node); })) {
+        std::cout << "Replacing constant expressions" << std::endl;
+    }
 }
