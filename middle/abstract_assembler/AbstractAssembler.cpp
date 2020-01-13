@@ -59,7 +59,11 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
     for (const auto &command : commandList.commands) {
         long long tempVars = 0;
 
-        if (auto readNode = dynamic_cast<Read *>(command)) { // READ
+        if (auto commandList = dynamic_cast<CommandList *>(command)) { // NESTED COMMANDLIST
+            SimpleResolution *assmebledCommands = assembleCommands(*commandList);
+            instructions.append(assmebledCommands->instructions);
+            tempVars += assmebledCommands->temporaryVars;
+        } else if (auto readNode = dynamic_cast<Read *>(command)) { // READ
             Resolution *idRes = resolve(readNode->identifier);
 
             if (!idRes->writable) throw "Trying to read to non-writable variable " + readNode->identifier.name;

@@ -4,9 +4,14 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 #ifndef COMPILER_NODE_H
 #define COMPILER_NODE_H
+
+class Node;
+
+typedef std::function<Node *(Node *)> Callback;
 
 enum BinaryExpressionType {
     ADDITION,
@@ -34,6 +39,8 @@ public:
 
     virtual std::string toString(int indentation) = 0;
 
+    virtual Node *copy(Callback replacer) = 0;
+
     virtual ~Node() {}
 };
 
@@ -46,6 +53,8 @@ public:
 
     AbstractIdentifier(std::string &name) : name(name) {}
 
+    virtual Node *copy(Callback replacer) = 0;
+
     virtual ~AbstractIdentifier() {}
 };
 
@@ -55,6 +64,10 @@ public:
 class VariableIdentifier : public AbstractIdentifier {
 public:
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new VariableIdentifier(name));
+    }
 
     VariableIdentifier(std::string &name) : AbstractIdentifier(name) {}
 };
@@ -68,6 +81,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new AccessIdentifier(name, index));
+    }
+
     AccessIdentifier(std::string &name, long long index) : AbstractIdentifier(name), index(index) {}
 };
 
@@ -80,6 +97,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new VariableAccessIdentifier(name, accessName));
+    }
+
     VariableAccessIdentifier(std::string &name, std::string &accessName)
             : AbstractIdentifier(name), accessName(accessName) {}
 };
@@ -90,6 +111,8 @@ public:
 class AbstractValue : public Node {
 public:
     virtual ~AbstractValue() {}
+
+    virtual Node *copy(Callback replacer) = 0;
 };
 
 /**
@@ -100,6 +123,10 @@ public:
     long long value;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new NumberValue(value));
+    }
 
     NumberValue(long long value) : value(value) {}
 };
@@ -113,6 +140,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new IdentifierValue(*static_cast<AbstractIdentifier *>(identifier.copy(replacer))));
+    }
+
     IdentifierValue(AbstractIdentifier &identifier) : identifier(identifier) {}
 };
 
@@ -122,6 +153,8 @@ public:
 class AbstractExpression : public Node {
 public:
     virtual ~AbstractExpression() {}
+
+    virtual Node *copy(Callback replacer) = 0;
 };
 
 /**
@@ -132,6 +165,10 @@ public:
     AbstractValue &value;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new UnaryExpression(*static_cast<AbstractValue *>(value.copy(replacer))));
+    }
 
     UnaryExpression(AbstractValue &value) : value(value) {}
 };
@@ -146,6 +183,10 @@ public:
     BinaryExpressionType type;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new BinaryExpression(*static_cast<AbstractValue *>(lhs.copy(replacer)), *static_cast<AbstractValue *>(rhs.copy(replacer)), type));
+    }
 
     BinaryExpression(AbstractValue &lhs, AbstractValue &rhs, BinaryExpressionType type)
             : lhs(lhs), rhs(rhs), type(type) {}
@@ -162,6 +203,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new Condition(*static_cast<AbstractValue *>(lhs.copy(replacer)), *static_cast<AbstractValue *>(rhs.copy(replacer)), type));
+    }
+
     Condition(AbstractValue &lhs, AbstractValue &rhs, ConditionType type)
             : lhs(lhs), rhs(rhs), type(type) {}
 };
@@ -172,6 +217,8 @@ public:
 class Command : public Node {
 public:
     virtual ~Command() {}
+
+    virtual Node *copy(Callback replacer) = 0;
 };
 
 class CommandList : public Node {
@@ -179,6 +226,19 @@ public:
     std::vector<Node *> commands;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        CommandList *cmdList = new CommandList();
+
+        for (const auto &cmd : commands) {
+            cmdList->commands.push_back(cmd->copy(replacer));
+        }
+        return cmdList;
+    }
+
+    void append(CommandList &commandList) {
+        commands.insert(commands.end(), commandList.commands.begin(), commandList.commands.end());
+    }
 
     CommandList() {}
 };
@@ -189,6 +249,10 @@ public:
     AbstractExpression &expression;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new Assignment(*static_cast<AbstractIdentifier *>(identifier.copy(replacer)), *static_cast<AbstractExpression *>(expression.copy(replacer))));
+    }
 
     Assignment(AbstractIdentifier &identifier, AbstractExpression &expression)
             : identifier(identifier), expression(expression) {}
@@ -201,6 +265,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new If(*static_cast<Condition *>(condition.copy(replacer)), *static_cast<CommandList * >(commands.copy(replacer))));
+    }
+
     If(Condition &condition, CommandList &commands) : condition(condition), commands(commands) {}
 };
 
@@ -211,6 +279,11 @@ public:
     CommandList &elseCommands;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(
+                new IfElse(*static_cast<Condition *>(condition.copy(replacer)), *static_cast<CommandList *>(commands.copy(replacer)), *static_cast<CommandList *>(elseCommands.copy(replacer))));
+    }
 
     IfElse(Condition &condition, CommandList &commands, CommandList &elseCommands)
             : condition(condition), commands(commands), elseCommands(elseCommands) {}
@@ -223,6 +296,10 @@ public:
     bool doWhile;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new While(*static_cast<Condition *>(condition.copy(replacer)), *static_cast<CommandList *>(commands.copy(replacer)), doWhile));
+    }
 
     While(Condition &condition, CommandList &commands, bool doWhile = false)
             : condition(condition), commands(commands), doWhile(doWhile) {}
@@ -238,6 +315,11 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new For(variableName, *static_cast<AbstractValue *>(startValue.copy(replacer)), *static_cast<AbstractValue *>(endValue.copy(replacer)),
+                                *static_cast<CommandList *>(commands.copy(replacer))));
+    }
+
     For(std::string &variableName, AbstractValue &startValue, AbstractValue &endValue,
         CommandList &commands,
         bool reversed = false)
@@ -251,6 +333,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new Read(*static_cast<AbstractIdentifier *>(identifier.copy(replacer))));
+    }
+
     Read(AbstractIdentifier &identifier) : identifier(identifier) {}
 };
 
@@ -260,12 +346,18 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new Write(*static_cast<AbstractValue *>(value.copy(replacer))));
+    }
+
     Write(AbstractValue &value) : value(value) {}
 };
 
 class AbstractDeclaration : public Node {
 public:
     virtual ~AbstractDeclaration() {}
+
+    virtual Node *copy(Callback replacer) = 0;
 };
 
 class IdentifierDeclaration : public AbstractDeclaration {
@@ -273,6 +365,10 @@ public:
     std::string &name;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        return replacer(new IdentifierDeclaration(name));
+    }
 
     IdentifierDeclaration(std::string &name) : name(name) {}
 };
@@ -285,6 +381,10 @@ public:
 
     virtual std::string toString(int indentation);
 
+    virtual Node *copy(Callback replacer) {
+        return replacer(new ArrayDeclaration(name, start, end));
+    }
+
     ArrayDeclaration(std::string &name, long long start, long long end) : name(name), start(start), end(end) {}
 };
 
@@ -293,6 +393,16 @@ public:
     std::vector<AbstractDeclaration *> declarations;
 
     virtual std::string toString(int indentation);
+
+    virtual Node *copy(Callback replacer) {
+        DeclarationList *dclList = new DeclarationList();
+
+        for (auto const &dcl : declarations) {
+            dclList->declarations.push_back(static_cast<AbstractDeclaration *>(dcl->copy(replacer)));
+        }
+
+        return dclList;
+    }
 
     DeclarationList() {}
 };

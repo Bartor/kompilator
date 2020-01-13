@@ -64,22 +64,53 @@ Node *ASTOptimizer::constantLoopUnroller(Node *node) {
     if (auto forNode = dynamic_cast<For *>(node)) {
         try {
             auto startConstant = dynamic_cast<NumberValue &>(forNode->startValue);
-
             try {
                 auto endConstant = dynamic_cast<NumberValue &>(forNode->endValue);
 
+                long long iterationStart = forNode->reversed ? endConstant.value : startConstant.value;
+                long long iterationEnd = forNode->reversed ? startConstant.value : endConstant.value;
 
+                CommandList *cmdList = new CommandList();
+
+                for (long long i = iterationStart; forNode->reversed ? i >= iterationEnd : i <= iterationEnd; forNode->reversed ? i-- : i++) {
+                    Callback replacer = iteratorReplacer(forNode->variableName, i);
+                    originalProgram->constants.constants.push_back(i);
+                    CommandList *forCommands = static_cast<CommandList *>(forNode->commands.copy(replacer));
+                    cmdList->append(*forCommands);
+                }
+
+                std::cout << "generated new commandlist" << std::endl << cmdList->toString(0) << std::endl;
+                return cmdList;
             } catch (std::bad_cast _) {}
         } catch (std::bad_cast _) {}
     }
     return node;
 }
 
-Node* ASTOptimizer::iteratorReplacer(Node *node, VariableIdentifier *variableToReplace, NumberValue *valueToPlace) {
-    throw "NOT IMPLEMENTED";
-    return node;
+Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long long value) {
+    return [this, variableToReplace, value](Node *node) -> Node * {
+        if (auto idVal = dynamic_cast<IdentifierValue *>(node)) {
+            try {
+                VariableIdentifier &varId = dynamic_cast<VariableIdentifier &>(idVal->identifier);
+
+                if (varId.name == variableToReplace) {
+                    return new NumberValue(value);
+                }
+            } catch (std::bad_cast _) {
+                try {
+                    VariableAccessIdentifier &varAccId = dynamic_cast<VariableAccessIdentifier &>(idVal->identifier);
+
+                    if (varAccId.accessName == variableToReplace) {
+                        return new IdentifierValue(*new AccessIdentifier(varAccId.name, value));
+                    }
+                } catch (std::bad_cast _) {}
+            }
+        }
+        return node;
+    };
 }
 
 void ASTOptimizer::optimize() {
     traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantExpressionOptimizer(node); });
+    traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); });
 }

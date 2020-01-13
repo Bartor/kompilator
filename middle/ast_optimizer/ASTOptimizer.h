@@ -6,8 +6,6 @@
 #ifndef COMPILER_ASTOPTIMIZER_H
 #define COMPILER_ASTOPTIMIZER_H
 
-typedef std::function<Node *(Node *)> Callback;
-
 class ASTOptimizer {
 private:
     Program *originalProgram;
@@ -20,7 +18,7 @@ private:
 
     Node *constantLoopUnroller(Node *node);
 
-    Node *iteratorReplacer(Node *node, VariableIdentifier *variableToReplace, NumberValue *valueToPlace);
+    Callback iteratorReplacer(std::string &variableToReplace, long long value);
 public:
     ASTOptimizer(Program *program) : originalProgram(program) {}
 

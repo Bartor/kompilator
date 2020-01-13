@@ -1,12 +1,5 @@
-DECLARE
-    b, c, d, a(-3:2), e
 BEGIN
-    c ASSIGN -3;
-    d ASSIGN -7;
-    b ASSIGN 1;
-    e ASSIGN 2;
-    a(b) ASSIGN c;
-    a(e) ASSIGN d;
-    a(0) ASSIGN a(b) TIMES a(e);
-    WRITE a(0);
+  FOR i FROM 1 TO 10 DO
+    WRITE i;
+  ENDFOR
 END
