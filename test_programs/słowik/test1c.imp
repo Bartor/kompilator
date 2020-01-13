@@ -1,0 +1,15 @@
+DECLARE
+    j, k
+BEGIN
+    READ k;
+    FOR i FROM 1 TO k DO
+        IF i EQ 1 THEN
+            j ASSIGN 1;
+        ELSE
+            j ASSIGN j TIMES 2;
+        ENDIF
+    ENDFOR
+    IF k GEQ 1 THEN
+        WRITE j;
+    ENDIF
+END

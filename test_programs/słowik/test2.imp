@@ -1,0 +1,57 @@
+[ Rozklad liczby 340282367713220089251654026161790386200 na czynniki pierwsze ]
+[ Oczekiwany wynik:
+  2^3
+  3
+  5^2
+  7
+  13
+  41
+  61
+  641
+  1321
+  6700417
+  613566757
+  715827883
+]
+DECLARE
+    a(0:3),
+    n, m, reszta, potega, dzielnik
+BEGIN
+    a(0) ASSIGN 4294967297;
+    a(1) ASSIGN 4294967298;
+    a(2) ASSIGN 4294967299;
+    a(3) ASSIGN 4294967300;
+
+    WRITE a(0);
+    WRITE a(1);
+    WRITE a(2);
+    WRITE a(3);
+
+    n ASSIGN a(0) TIMES a(1);
+    n ASSIGN n TIMES a(2);
+    n ASSIGN n TIMES a(3);
+
+    dzielnik ASSIGN 2;
+    m ASSIGN dzielnik TIMES dzielnik;
+    WHILE n GEQ m DO
+        potega ASSIGN 0;
+        reszta ASSIGN n MOD dzielnik;
+        WHILE reszta EQ 0 DO
+            n ASSIGN n DIV dzielnik;
+            potega ASSIGN potega PLUS 1;
+            reszta ASSIGN n MOD dzielnik;
+        ENDWHILE
+        IF potega GE 0 THEN
+            WRITE dzielnik;
+            WRITE potega;
+        ELSE
+            dzielnik ASSIGN dzielnik PLUS 1;
+            m ASSIGN dzielnik TIMES dzielnik;
+        ENDIF
+    ENDWHILE
+    IF n NEQ 1 THEN
+        WRITE n;
+        WRITE 1;
+    ENDIF
+END
+

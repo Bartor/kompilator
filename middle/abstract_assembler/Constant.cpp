@@ -1,5 +1,21 @@
 #include "Constant.h"
 
+char *lltoa(unsigned long long val, int base) {
+    static char buf[64] = {0};
+
+    int i = 62;
+    int sign = (val < 0);
+    if (sign) val = -val;
+
+    if (val == 0) return "0";
+
+    for (; val && i; --i, val /= base) {
+        buf[i] = "0123456789abcdef"[val % base];
+    }
+
+    return &buf[i + 1];
+}
+
 InstructionList &Constant::generateConstant(Constants *constantsData, ResolvableAddress &primaryAccumulator, ResolvableAddress &secondaryAccumulator) {
     InstructionList &instructions = *new InstructionList();
     instructions.append(new Sub(primaryAccumulator));
@@ -17,16 +33,15 @@ InstructionList &Constant::generateConstant(Constants *constantsData, Resolvable
             while (valCpy++ < 0) instructions.append(new Dec());
         }
     } else if (value) {
-        long long newValue = value < 0 ? -value : value;
-        int bitPos = log2(newValue) + 1;
+        unsigned long long valCpy = value > 0 ? value : -value;
+        std::string number = std::string(lltoa(valCpy, 2));
 
-        while (--bitPos > 0) {
-            if (newValue & (1 << bitPos)) {
-                instructions.append(new Inc());
+        for (int i = 0; i < number.size(); i++) {
+            if (number[i] == '1') instructions.append(new Inc());
+            if (i != number.size() - 1) {
+                instructions.append(new Shift(constantsData->getConstant(1)->getAddress()));
             }
-            instructions.append(new Shift(constantsData->getConstant(1)->getAddress()));
         }
-        if (newValue & 1) instructions.append(new Inc());
 
         if (value < 0) {
             instructions.append(new Store(secondaryAccumulator));

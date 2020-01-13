@@ -2,7 +2,6 @@
 #include "../../back/asm/asm.h"
 #include "../../back/asm/InstructionList.h"
 #include <math.h>
-
 #include <string>
 
 #ifndef COMPILER_CONSTANT_H

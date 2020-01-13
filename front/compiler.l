@@ -19,7 +19,7 @@ comment \[(.|\n)*\]
 \r              ;
 [[:blank:]]+    ;
 {pidentifier}   { yylval.stringValue = new std::string(yytext, yyleng); return PIDENTIFIER; }
-{number}        { yylval.numberValue = atoi(yytext); return NUMBER; }
+{number}        { yylval.numberValue = atoll(yytext); return NUMBER; }
 DECLARE         { return TOKEN(DECLARE); }
 BEGIN           { return TOKEN(T_BEGIN); }
 END             { return TOKEN(END); }

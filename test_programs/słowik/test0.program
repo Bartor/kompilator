@@ -1,0 +1,30 @@
+DECLARE
+    a, b, c, d, e, f, g, h, x
+BEGIN
+    READ a;
+    READ b;
+    READ c;
+    READ d;
+    READ e;
+    READ f;
+    READ g;
+    READ h;
+    x ASSIGN 0;
+    FOR i FROM 1 TO a DO
+        FOR j FROM -1 DOWNTO b DO
+            FOR k FROM 1 TO c DO
+                FOR l FROM -1 DOWNTO d DO
+                    FOR m FROM 1 TO e DO
+                        FOR n FROM -1 DOWNTO f DO
+                            FOR o FROM 1 TO g DO
+                                FOR p FROM -1 DOWNTO h DO
+                                    x ASSIGN x PLUS 1;
+                                ENDFOR
+                            ENDFOR
+                        ENDFOR
+                    ENDFOR
+                ENDFOR
+            ENDFOR
+        ENDFOR
+    ENDFOR
+END
