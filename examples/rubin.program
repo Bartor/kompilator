@@ -1,10 +1,8 @@
 DECLARE
-    a
+    a, b
 BEGIN
-  FOR i FROM 1 TO 3 DO
-    FOR j FROM 1 TO 3 DO
-        a ASSIGN i TIMES j;
-        WRITE a;
-    ENDFOR
-  ENDFOR
+    READ a;
+    READ b;
+    a ASSIGN a DIV b;
+    WRITE a;
 END

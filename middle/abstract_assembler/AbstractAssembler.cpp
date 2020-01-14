@@ -2,25 +2,29 @@
 
 std::string TEMPORARY_NAMES = "!TEMP";
 
-InstructionList &AbstractAssembler::assembleConstants() {
+void AbstractAssembler::prepareConstants() {
     constants = new Constants(accumulatorNumber);
-    InstructionList &list = *new InstructionList();
-
     std::cout << "Adding 1 and -1 constants" << std::endl;
+
     Constant *resOne = constants->addConstant(1);
     Constant *resMinusOne = constants->addConstant(-1);
 
-    list.append(resOne->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
-    list.append(resMinusOne->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
-
     for (const auto num : program.constants.constants) {
-        Constant *constantAddress = constants->addConstant(num);
+        Constant *constantPointer = constants->addConstant(num);
 
-        if (constantAddress) {
-            std::cout << constantAddress->toString() + " at " << constantAddress->getAddress().getAddress() << std::endl;
-
-            list.append(constantAddress->generateConstant(constants, primaryAccumulator, secondaryAccumulator));
+        if (constantPointer) {
+            std::cout << constantPointer->toString() + " at " << constantPointer->getAddress().getAddress() << std::endl;
         }
+    }
+}
+
+InstructionList &AbstractAssembler::assembleConstants() {
+    InstructionList &list = *new InstructionList();
+
+    for (const auto &constant : constants->getConstants()) {
+        InstructionList &generatedCode = constant->generateConstant(constants, primaryAccumulator, secondaryAccumulator);
+
+        list.append(generatedCode);
     }
 
     return list;
@@ -28,10 +32,10 @@ InstructionList &AbstractAssembler::assembleConstants() {
 
 void AbstractAssembler::getVariablesFromDeclarations() {
     scopedVariables = new ScopedVariables(
-            1
-            + accumulatorNumber // offset by accumulators...
-            + program.constants.constants.size() // ...constants...
-            + program.declarations.declarations.size() // ...and possible constants
+            1 // next address...
+            + accumulatorNumber // ...offset by accumulators...
+            + program.constants.constants.size() * 2 // ...constants times two for additional special constants (1024 = 2^10, so we may need 10 as well)
+            + program.declarations.declarations.size() * 2 // ...and possible constants (array starting addresses + array starting indexes)
     );
 
     for (const auto &declaration : program.declarations.declarations) {
@@ -316,6 +320,32 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
             bool modulo = false;
             switch (binaryExpression.type) {
                 case ADDITION: {
+                    bool incResolved = false;
+                    if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) {
+                        NumberValue &constantValue = dynamic_cast<NumberValue &>(rhsResolution->type == CONSTANT ? binaryExpression.rhs : binaryExpression.lhs);
+
+                        if (llabs(constantValue.value) < 10) {
+                            incResolved = true;
+
+                            instructionList.append(rhsResolution->type == CONSTANT ? lhsResolution->instructions : rhsResolution->instructions)
+                                    .append(rhsResolution->type == CONSTANT ? lhsLoad : rhsLoad);
+
+
+                            long long valCopy = constantValue.value;
+
+                            while (valCopy != 0) {
+                                if (valCopy < 0) {
+                                    instructionList.append(new Dec());
+                                } else {
+                                    instructionList.append(new Inc());
+                                }
+                                valCopy = valCopy + (valCopy < 0 ? 1 : -1);
+                            }
+                        }
+                    }
+
+                    if (incResolved) break;
+
                     if (rhsResolution->indirect) {
                         Store *storeLeft = new Store(secondaryAccumulator);
                         Add *add = new Add(secondaryAccumulator);
@@ -336,6 +366,31 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                 }
                     break;
                 case SUBTRACTION: {
+                    bool incResolved = false;
+                    if (rhsResolution->type == CONSTANT) {
+                        NumberValue &constantValue = dynamic_cast<NumberValue &>(binaryExpression.rhs);
+
+                        if (llabs(constantValue.value) < 10) {
+                            incResolved = true;
+
+                            instructionList.append(lhsResolution->instructions)
+                                    .append(lhsLoad);
+
+                            long long valCopy = constantValue.value;
+
+                            while (valCopy != 0) {
+                                if (valCopy < 0) {
+                                    instructionList.append(new Inc());
+                                } else {
+                                    instructionList.append(new Dec());
+                                }
+                                valCopy = valCopy + (valCopy < 0 ? 1 : -1);
+                            }
+                        }
+                    }
+
+                    if (incResolved) break;
+
                     if (rhsResolution->indirect) {
                         Sub *sub = new Sub(expressionAccumulator);
                         Store *storeRight = new Store(secondaryAccumulator);
@@ -358,6 +413,37 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                 case MODULO:
                     modulo = true;
                 case DIVISION: {
+                    bool incResolved = false;
+                    if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) { // know constants optimization
+                        bool rhsFlag = rhsResolution->type == CONSTANT;
+
+                        NumberValue &constantValue = dynamic_cast<NumberValue &>(rhsFlag ? binaryExpression.rhs : binaryExpression.lhs);
+                        bool negative = constantValue.value < 0;
+                        long long valCopy = llabs(constantValue.value);
+
+                        if (rhsFlag && valCopy == 1) { // a/1, a/-1
+                            incResolved = true;
+
+                            if (modulo) {
+                                instructionList.append(new Sub(primaryAccumulator));
+                            } else {
+                                instructionList.append(lhsResolution->instructions)
+                                        .append(lhsLoad);
+
+                                if (negative) {
+                                    instructionList.append(new Store(expressionAccumulator))
+                                            .append(new Sub(expressionAccumulator))
+                                            .append(new Sub(expressionAccumulator));
+                                }
+                            }
+                        } else if (valCopy == 0) { // a = 0 or b = 0
+                            instructionList.append(new Sub(primaryAccumulator));
+                        }
+                    }
+
+                    if (incResolved) break;
+
+
                     TemporaryVariable *scaledDivisor = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *sign = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *divisor = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
@@ -557,6 +643,47 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                 }
                     break;
                 case MULTIPLICATION: { // A * B
+                    bool incResolved = false;
+                    if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) { // know constants optimization
+                        bool rhsFlag = rhsResolution->type == CONSTANT;
+
+                        NumberValue &constantValue = dynamic_cast<NumberValue &>(rhsFlag ? binaryExpression.rhs : binaryExpression.lhs);
+                        bool negative = constantValue.value < 0;
+                        long long valCopy = llabs(constantValue.value);
+
+                        if (valCopy && (valCopy & (valCopy - 1)) == 0) { // 2^n
+                            incResolved = true;
+
+                            long long power = 0;
+                            while (valCopy = valCopy >> 1) power++;
+
+                            constants->addConstant(power);
+
+                            instructionList.append(rhsFlag ? lhsResolution->instructions : rhsResolution->instructions)
+                                    .append(rhsFlag ? lhsLoad : rhsLoad)
+                                    .append(new Shift(constants->getConstant(power)->getAddress()));
+
+                            if (negative) {
+                                instructionList.append(new Store(expressionAccumulator))
+                                        .append(new Sub(expressionAccumulator))
+                                        .append(new Sub(expressionAccumulator));
+                            }
+                        } else if (valCopy == 1) { // 1, -1
+                            instructionList.append(rhsFlag ? lhsResolution->instructions : rhsResolution->instructions)
+                                    .append(rhsFlag ? lhsLoad : rhsLoad);
+
+                            if (negative) {
+                                instructionList.append(new Store(expressionAccumulator))
+                                        .append(new Sub(expressionAccumulator))
+                                        .append(new Sub(expressionAccumulator));
+                            }
+                        } else if (valCopy == 0) { // just 0 lol
+                            instructionList.append(new Sub(primaryAccumulator));
+                        }
+                    }
+
+                    if (incResolved) break;
+
                     TemporaryVariable *negativeATemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *negativeBTemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     scopedVariables->pushVariableScope(negativeATemp);
@@ -750,9 +877,11 @@ Resolution *AbstractAssembler::resolve(AbstractValue &value) {
 
 InstructionList &AbstractAssembler::assemble() {
     getVariablesFromDeclarations();
-    InstructionList &instructions = assembleConstants();
+    prepareConstants();
     SimpleResolution *programCodeResolution = assembleCommands(program.commands);
     std::cout << "Assembled programs returning " << programCodeResolution->temporaryVars << " temporary variables " << std::endl;
+    InstructionList &instructions = assembleConstants();
+    std::cout << "Assembled pre-generated constants code" << std::endl;
     instructions.append(programCodeResolution->instructions);
     instructions.seal();
     return instructions;

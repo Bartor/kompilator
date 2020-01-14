@@ -14,6 +14,10 @@ public:
 
     Constant *getConstant(long long value);
 
+    std::vector<Constant *> getConstants() {
+        return constants;
+    }
+
     long long lastAddress();
 
     Constants(long long startAddress = 2) : currentAddress(startAddress) {}

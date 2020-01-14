@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include <typeinfo>
+#include <cstdlib>
 
 #ifndef COMPILER_ABSTRACTASSEMBLER_H
 #define COMPILER_ABSTRACTASSEMBLER_H
@@ -52,6 +53,8 @@ private:
     Constants *constants;
 
     void getVariablesFromDeclarations();
+
+    void prepareConstants();
 
     InstructionList &assembleConstants();
 
