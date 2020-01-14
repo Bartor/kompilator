@@ -118,6 +118,8 @@ Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long lon
                     }
                 } catch (std::bad_cast _) {}
             }
+        } else if (auto varArrId = dynamic_cast<VariableAccessIdentifier *>(node)) {
+            if (varArrId->accessName == variableToReplace) return new AccessIdentifier(varArrId->name, value);
         }
         return node;
     };

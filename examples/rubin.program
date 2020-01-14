@@ -1,8 +1,12 @@
 DECLARE
-    a, b
+    a(1:10)
 BEGIN
-    READ a;
-    READ b;
-    a ASSIGN a DIV b;
-    WRITE a;
+    FOR i FROM 1 TO 10 DO
+        a(i) ASSIGN i PLUS 1;
+    ENDFOR
+    FOR i FROM 1 TO 10 DO
+        a(i) ASSIGN a(i) PLUS 1;
+    ENDFOR
+    WRITE a(10);    
 END
+
