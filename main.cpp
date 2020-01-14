@@ -68,11 +68,11 @@ int main(int argc, char **argv) {
         for (const auto &ins : assembled.getInstructions()) {
             if (!ins->stub) {
                 std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
-                if (!optimize || true) output << ins->toAssemblyCode(true) << std::endl; // todo fix peephole
+                if (!optimize) output << ins->toAssemblyCode(true) << std::endl;
             }
         }
 
-        if (optimize && false) { // todo fix peephole
+        if (optimize) {
             std::cout << "- ASM Optimization -" << std::endl;
             PeepholeOptimizer *peepholeOptimizer = new PeepholeOptimizer(assembled);
 

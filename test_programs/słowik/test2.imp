@@ -22,11 +22,6 @@ BEGIN
     a(2) ASSIGN 4294967299;
     a(3) ASSIGN 4294967300;
 
-    WRITE a(0);
-    WRITE a(1);
-    WRITE a(2);
-    WRITE a(3);
-
     n ASSIGN a(0) TIMES a(1);
     n ASSIGN n TIMES a(2);
     n ASSIGN n TIMES a(3);

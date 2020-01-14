@@ -13,7 +13,7 @@ bool PeepholeOptimizer::removeUselessStoreLoads() {
     for (int i = 0; i < instructions.getInstructions().size(); i++) {
         if (auto storeInstruction = dynamic_cast<Store *>(instructions.getInstructions()[i])) {
 
-            int offsetToNonStub = 1;
+            int offsetToNonStub = 0;
             while (dynamic_cast<Stub *>(instructions.getInstructions()[++offsetToNonStub + i])) {
                 if (i + offsetToNonStub == instructions.getInstructions().size()) return false;
             }
@@ -48,7 +48,7 @@ bool PeepholeOptimizer::removeUselessStoreLoadis() {
     for (int i = 0; i < instructions.getInstructions().size(); i++) {
         if (auto storeInstruction = dynamic_cast<Store *>(instructions.getInstructions()[i])) {
 
-            int offsetToNonStub = 1;
+            int offsetToNonStub = 0;
             while (dynamic_cast<Stub *>(instructions.getInstructions()[++offsetToNonStub + i])) {
                 if (i + offsetToNonStub == instructions.getInstructions().size()) return false;
             }
