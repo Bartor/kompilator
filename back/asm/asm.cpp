@@ -12,24 +12,8 @@ std::string Stub::toAssemblyCode(bool pretty) {
     return "ERROR - stub instructions should NEVER be compiled!";
 }
 
-void Stub::redirect(Stub *newTarget) {
-    target = newTarget;
-    newTarget->registerRedirection(this);
-
-    for (const auto &s : redirections) {
-        s->redirect(newTarget);
-    }
-}
-
-void Stub::registerRedirection(Stub *newRedirection) {
-    redirections.push_back(newRedirection);
-}
-
 long long Stub::getAddress() {
-    if (target == this) {
-        return address;
-    }
-    return target->getAddress();
+    return address;
 }
 
 void Stub::setAddress(long long newAddress) {

@@ -5,6 +5,9 @@ class Constant;
 
 #include "Constant.h"
 
+/**
+ * Allows for finding addresses of available constants when compiling.
+ */
 class Constants {
 private:
     std::vector<Constant *> constants;

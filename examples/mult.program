@@ -1,8 +1,0 @@
-DECLARE
-    a, b
-BEGIN
-    READ a;
-    READ b;
-    a ASSIGN a TIMES b;
-    WRITE a;
-END

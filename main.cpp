@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
             PeepholeOptimizer *peepholeOptimizer = new PeepholeOptimizer(assembled);
 
             peepholeOptimizer->optimize();
-            assembled.seal();
+            assembled.seal(false);
 
             std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
 

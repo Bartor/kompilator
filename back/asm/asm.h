@@ -5,6 +5,16 @@
 #ifndef COMPILER_ASM_H
 #define COMPILER_ASM_H
 
+/**
+ * An abstract class representing a single assembly instruction.
+ * It has a protected address field which is set and get using
+ * setters and getters; this address field indicated instruction's
+ * place in the generated assmebly code, for example in
+ * LOAD 1
+ * ADD 2
+ * STORE 1
+ * LOAD has address of 0, ADD - 2 and STORE - 3.
+ */
 class Instruction {
 protected:
     long long address = -1;
@@ -20,23 +30,32 @@ public:
     virtual ~Instruction() {}
 };
 
+/**
+ * This is a special instruction which is basically a NOP. Its
+ * address field should ALWAYS be set to the same address as the
+ * next instruction in file. It should not be assembled, as it is
+ * not a part of assembly language. For example
+ * JUMP 3
+ * LOAD 2
+ * STORE 3
+ * STUB
+ * PUT
+ * the STUB and PUT instructions has an compile-time address of 3
+ * and should therefore be compiled down to
+ * JUMP 3
+ * LOAD 2
+ * STORE 3
+ * PUT
+ */
 class Stub : public Instruction {
-private:
-    Stub *target;
-    std::vector<Stub *> redirections;
 public:
     virtual std::string toAssemblyCode(bool pretty = false);
-
-    void redirect(Stub *newTarget);
 
     void setAddress(long long newAddress);
 
     long long getAddress();
 
-    void registerRedirection(Stub *newRedirection);
-
     Stub() {
-        target = this;
         stub = true;
     }
 };
@@ -129,6 +148,14 @@ public:
     Shift(ResolvableAddress &address) : address(address) {}
 };
 
+/**
+ * A basic JUMP instruction with a Instruction* target field.
+ * When assembled, it uses target's getAddress to fetch a jump
+ * address and only then prints it as a number value. For every
+ * other circumstance the target is just an abstract instruction
+ * pointer and thus allows to freely add and remove instructions
+ * before and after without needing to be offset.
+ */
 class Jump : public Instruction {
 public:
     Instruction *target;

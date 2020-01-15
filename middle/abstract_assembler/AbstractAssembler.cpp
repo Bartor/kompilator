@@ -883,6 +883,6 @@ InstructionList &AbstractAssembler::assemble() {
     InstructionList &instructions = assembleConstants();
     std::cout << "Assembled pre-generated constants code" << std::endl;
     instructions.append(programCodeResolution->instructions);
-    instructions.seal();
+    instructions.seal(true);
     return instructions;
 }

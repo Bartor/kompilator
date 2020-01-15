@@ -10,11 +10,6 @@ void ScopedVariables::pushVariableScope(Variable *variable) {
     variable->getAddress().setAddress(currentAddress);
     variables.push_back(variable);
     currentAddress += variable->size;
-
-//    std::cout << "+" << variable->toString() << std::endl;
-//    for (const auto &var : variables) {
-//        std::cout << "  " << var->toString() << std::endl;
-//    }
 }
 
 void ScopedVariables::popVariableScope(long long times) {
@@ -23,11 +18,6 @@ void ScopedVariables::popVariableScope(long long times) {
 
         currentAddress -= variables.back()->size;
         variables.pop_back();
-
-//        std::cout << "-" << v->toString() << std::endl;
-//        for (const auto &var : variables) {
-//            std::cout << "  " << var->toString() << std::endl;
-//        }
     }
 }
 

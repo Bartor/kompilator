@@ -31,7 +31,7 @@ enum ConditionType {
 };
 
 /**
- * Base abstract class for representing anything in AST
+ * Base abstract class for representing anything in AST.
  */
 class Node {
 public:
@@ -39,13 +39,23 @@ public:
 
     virtual std::string toString(int indentation) = 0;
 
+    /**
+     * A special replacer-copy function, which allows for a recursive copy of this
+     * AST node using a special replacer function with each of its leaves.
+     * @param replacer A function to be used on a copy. This function will return
+     * a normal copy or an augmented copy of this node. E.g. if we needed to replace
+     * every IdentifierValue in this node (and its children) with a NumberValue
+     * we would just write a Callback function dynamic casting to check if a node
+     * is a IdentifierValue and then returning a NumberValue.
+     * @return An exact copy of this node with respect to replacer function.
+     */
     virtual Node *copy(Callback replacer) = 0;
 
     virtual ~Node() {}
 };
 
 /**
- * Base class for VariableIdentifier, AccessIdentifier and VariableAccessIdentifier
+ * An identifier in the language, e.g. a, a[0], a[b].
  */
 class AbstractIdentifier : public Node {
 public:
@@ -59,7 +69,7 @@ public:
 };
 
 /**
- * a
+ * A variable identifier, e.g. a.
  */
 class VariableIdentifier : public AbstractIdentifier {
 public:
@@ -73,7 +83,7 @@ public:
 };
 
 /**
- * a[0]
+ * A static array access identifier, e.g. a[0].
  */
 class AccessIdentifier : public AbstractIdentifier {
 public:
@@ -89,7 +99,7 @@ public:
 };
 
 /**
- * a[b]
+ * A variable array access identifier, e.g. a[b].
  */
 class VariableAccessIdentifier : public AbstractIdentifier {
 public:
@@ -106,7 +116,7 @@ public:
 };
 
 /**
- * Values are used in iterators, expressions and conditions
+ * A value in the language, e.g. 5 or identifier.
  */
 class AbstractValue : public Node {
 public:
@@ -116,7 +126,7 @@ public:
 };
 
 /**
- * 5
+ * A number representing a value, e.g. 5.
  */
 class NumberValue : public AbstractValue {
 public:
@@ -132,7 +142,7 @@ public:
 };
 
 /**
- * a, a[0], a[b]
+ * A value taken from an identifier, e.g. a, a[0], a[b].
  */
 class IdentifierValue : public AbstractValue {
 public:
@@ -148,7 +158,7 @@ public:
 };
 
 /**
- * Basically math
+ * An expression which represents either a value or some operating on two values.
  */
 class AbstractExpression : public Node {
 public:
@@ -158,7 +168,7 @@ public:
 };
 
 /**
- * Basically a Value
+ * Represents a single-value expression.
  */
 class UnaryExpression : public AbstractExpression {
 public:
@@ -174,7 +184,8 @@ public:
 };
 
 /**
- * +, -, *, /, %
+ * Represents a double-value expression; addition, subtraction, division,
+ * multiplication, modulo.
  */
 class BinaryExpression : public AbstractExpression {
 public:
@@ -193,7 +204,8 @@ public:
 };
 
 /**
- * >, <, ==, !==, >=, <=
+ * Represents a logical condition which can be either true or false, e.g.
+ * equal, not equal, less, greater, less or equal, greater or equal.
  */
 class Condition : public Node {
 public:
@@ -212,7 +224,7 @@ public:
 };
 
 /**
- * Base abstract class for data manipulation, looping etc.
+ * Represents a single thing a program can do.
  */
 class Command : public Node {
 public:
@@ -221,6 +233,9 @@ public:
     virtual Node *copy(Callback replacer) = 0;
 };
 
+/**
+ * Holds multiple nodes of an AST.
+ */
 class CommandList : public Node {
 public:
     std::vector<Node *> commands;
@@ -243,6 +258,9 @@ public:
     CommandList() {}
 };
 
+/**
+ * Assigns an expression to a variable, e.g. a ASSIGN 5 PLUS x;
+ */
 class Assignment : public Command {
 public:
     AbstractIdentifier &identifier;
@@ -258,6 +276,9 @@ public:
             : identifier(identifier), expression(expression) {}
 };
 
+/**
+ * Executes given commands when a condition is met.
+ */
 class If : public Command {
 public:
     Condition &condition;
@@ -272,6 +293,9 @@ public:
     If(Condition &condition, CommandList &commands) : condition(condition), commands(commands) {}
 };
 
+/**
+ * Executes two separate sets of commands following condition's result.
+ */
 class IfElse : public Command {
 public:
     Condition &condition;
@@ -289,6 +313,9 @@ public:
             : condition(condition), commands(commands), elseCommands(elseCommands) {}
 };
 
+/**
+ * Executes commands as long as a condition is truthy.
+ */
 class While : public Command {
 public:
     Condition &condition;
@@ -305,6 +332,11 @@ public:
             : condition(condition), commands(commands), doWhile(doWhile) {}
 };
 
+/**
+ * Executes commands fixed amount of times and creates a local
+ * variable (called iterator) which increments or decrements
+ * with each iteration.
+ */
 class For : public Command {
 public:
     std::string variableName;
@@ -327,6 +359,9 @@ public:
               reversed(reversed) {}
 };
 
+/**
+ * Reads user input into a variable.
+ */
 class Read : public Command {
 public:
     AbstractIdentifier &identifier;
@@ -340,6 +375,9 @@ public:
     Read(AbstractIdentifier &identifier) : identifier(identifier) {}
 };
 
+/**
+ * Writes a value to user output.
+ */
 class Write : public Command {
 public:
     AbstractValue &value;
@@ -353,6 +391,9 @@ public:
     Write(AbstractValue &value) : value(value) {}
 };
 
+/**
+ * Represents some abstract declaration on the start of the program.
+ */
 class AbstractDeclaration : public Node {
 public:
     virtual ~AbstractDeclaration() {}
@@ -360,6 +401,9 @@ public:
     virtual Node *copy(Callback replacer) = 0;
 };
 
+/**
+ * Declares a single variable.
+ */
 class IdentifierDeclaration : public AbstractDeclaration {
 public:
     std::string &name;
@@ -373,6 +417,9 @@ public:
     IdentifierDeclaration(std::string &name) : name(name) {}
 };
 
+/**
+ * Declares an array
+ */
 class ArrayDeclaration : public AbstractDeclaration {
 public:
     std::string &name;
@@ -388,6 +435,9 @@ public:
     ArrayDeclaration(std::string &name, long long start, long long end) : name(name), start(start), end(end) {}
 };
 
+/**
+ * Holds declarations used across the program.
+ */
 class DeclarationList : public Node {
 public:
     std::vector<AbstractDeclaration *> declarations;
@@ -407,11 +457,17 @@ public:
     DeclarationList() {}
 };
 
+/**
+ * Holds constants used across the program.
+ */
 class ConstantList {
 public:
     std::vector<long long> constants;
 };
 
+/**
+ * A single analyzed program.
+ */
 class Program {
 public:
     DeclarationList &declarations;

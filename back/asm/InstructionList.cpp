@@ -2,9 +2,7 @@
 
 InstructionList::InstructionList() {
     afterLast = new Stub();
-    first = new Stub();
-//    instructions.push_back(first); // first element stub
-    instructions.push_back(afterLast); // last element stub
+    instructions.push_back(afterLast);
 }
 
 std::vector<Instruction *> &InstructionList::getInstructions() {
@@ -16,17 +14,17 @@ Stub *InstructionList::end() {
 }
 
 Instruction *InstructionList::start() {
+    if (instructions.size() == 1) throw "Add something to the instruction list before asking for the start element";
     return instructions.front();
 }
 
 InstructionList &InstructionList::append(InstructionList &list) {
-//    end()->redirect(list.end()); // this seemed to be a good idea but suddenly wasn't
     instructions.insert(instructions.end() - 1, list.instructions.begin(), list.instructions.end());
     return *this;
 }
 
-void InstructionList::seal() {
-    instructions.push_back(new Halt());
+void InstructionList::seal(bool addHalt) {
+    if (addHalt) instructions.push_back(new Halt());
 
     long long counter = 0;
     for (const auto &ins : instructions) { // instruction address resolution
