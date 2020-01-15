@@ -11,10 +11,17 @@
 
 pidentifier [_a-z]+
 number -?([0-9]|[1-9][0-9]*)
-comment \[(.|\n)*\]
+commentOpen \[
+commentClose \]
+
+%x IN_COMMENT
 
 %%
-{comment}       ;
+{commentOpen}   { BEGIN(IN_COMMENT); }
+<IN_COMMENT>{
+    [^\]]           ;
+    {commentClose}  BEGIN(INITIAL);
+}
 \n              ;
 \r              ;
 [[:blank:]]+    ;
