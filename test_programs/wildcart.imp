@@ -2,7 +2,7 @@ DECLARE
     a, b
 BEGIN
     READ a;
-    READ b;
-    a ASSIGN a TIMES b;
-    WRITE a;
+    IF -4 NEQ a THEN
+        WRITE 1;
+    ENDIF
 END

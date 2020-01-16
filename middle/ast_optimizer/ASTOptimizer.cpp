@@ -37,8 +37,6 @@ Node *ASTOptimizer::constantExpressionOptimizer(Node *node) {
                 try {
                     auto rhsConstant = dynamic_cast<NumberValue &>(binaryExpression.rhs);
 
-                    std::cout << "- Optimizing constant binary expression - HANDLE OVERFLOWS" << std::endl;
-
                     long long newValue = 0;
                     switch (binaryExpression.type) {
                         case ADDITION:

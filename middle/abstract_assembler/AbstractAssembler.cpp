@@ -222,21 +222,50 @@ SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, Ins
     Resolution *lhsResolution = resolve(condition.lhs);
     Resolution *rhsResolution = resolve(condition.rhs);
 
-    if (rhsResolution->indirect) {
-        Store *store = new Store(expressionAccumulator);
-        Sub *sub = new Sub(expressionAccumulator);
+    bool incResolved = false;
+    if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) {
+        bool rhsFlag = rhsResolution->type == CONSTANT;
 
-        instructions.append(rhsResolution->instructions)
-                .append(rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(rhsResolution->address)))
-                .append(store)
-                .append(lhsResolution->instructions)
-                .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
-                .append(sub);
-    } else {
-        Sub *sub = new Sub(rhsResolution->address);
-        instructions.append(lhsResolution->instructions)
-                .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
-                .append(sub);
+        NumberValue &constantValue = dynamic_cast<NumberValue &>(rhsFlag ? condition.rhs : condition.lhs);
+        bool negative = constantValue.value < 0;
+        long long valCopy = llabs(constantValue.value);
+
+        if (valCopy < 10) {
+            if (rhsFlag) {
+                instructions.append(lhsResolution->instructions)
+                        .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)));
+                while (valCopy-- > 0) {
+                    instructions.append(negative ? static_cast<Instruction *>(new Inc()) : static_cast<Instruction *>(new Dec()));
+                }
+                incResolved = true;
+            } else if (condition.type == EQUAL || condition.type == NOT_EQUAL) {
+                incResolved = true;
+                instructions.append(rhsResolution->instructions)
+                        .append(rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(rhsResolution->address)));
+                while (valCopy-- > 0) {
+                    instructions.append(negative ? static_cast<Instruction *>(new Inc()) : static_cast<Instruction *>(new Dec()));
+                }
+            }
+        }
+    }
+
+    if (!incResolved) {
+        if (rhsResolution->indirect) {
+            Store *store = new Store(expressionAccumulator);
+            Sub *sub = new Sub(expressionAccumulator);
+
+            instructions.append(rhsResolution->instructions)
+                    .append(rhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(rhsResolution->address)))
+                    .append(store)
+                    .append(lhsResolution->instructions)
+                    .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
+                    .append(sub);
+        } else {
+            Sub *sub = new Sub(rhsResolution->address);
+            instructions.append(lhsResolution->instructions)
+                    .append(lhsResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(lhsResolution->address)))
+                    .append(sub);
+        }
     }
 
     switch (condition.type) {
@@ -437,7 +466,51 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                                             .append(new Sub(expressionAccumulator));
                                 }
                             }
+                        } else if (rhsFlag && valCopy == 2) {
+                            incResolved = true;
+
+                            if (modulo) { // a mod 2
+                                instructionList.append(lhsResolution->instructions)
+                                        .append(lhsLoad)
+                                        .append(new Jzero(instructionList.end()))
+                                        .append(new Store(expressionAccumulator))
+                                        .append(new Shift(constants->getConstant(-1)->getAddress()))
+                                        .append(new Shift(constants->getConstant(1)->getAddress()))
+                                        .append(new Sub(expressionAccumulator));
+                                if (!negative) {
+                                    instructionList.append(new Jzero(instructionList.end()))
+                                            .append(new Inc())
+                                            .append(new Inc());
+                                }
+                            } else { // a div 2
+                                InstructionList &positiveABlock = *new InstructionList();
+                                positiveABlock.append(new Shift(constants->getConstant(-1)->getAddress()))
+                                        .append(new Jump(instructionList.end()));
+
+                                instructionList.append(lhsResolution->instructions)
+                                        .append(lhsLoad)
+                                        .append(new Jzero(instructionList.end()))
+                                        .append(new Jpos(positiveABlock.start()))
+                                        .append(new Store(expressionAccumulator))
+                                        .append(new Shift(constants->getConstant(1)->getAddress()))
+                                        .append(new Shift(constants->getConstant(-1)->getAddress()))
+                                        .append(new Sub(expressionAccumulator)); // parity check
+
+                                InstructionList &evenA = *new InstructionList();
+                                evenA.append(new Load(expressionAccumulator))
+                                        .append(new Shift(constants->getConstant(-1)->getAddress()))
+                                        .append(new Jump(instructionList.end()));
+
+                                instructionList.append(new Jzero(evenA.start()))
+                                        .append(new Load(expressionAccumulator))
+                                        .append(new Shift(constants->getConstant(-1)->getAddress()))
+                                        .append(new Dec())
+                                        .append(new Jump(instructionList.end()))
+                                        .append(evenA)
+                                        .append(positiveABlock);
+                            }
                         } else if (valCopy == 0) { // a = 0 or b = 0
+                            incResolved = true;
                             instructionList.append(new Sub(primaryAccumulator));
                         }
                     }
@@ -493,7 +566,8 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                         loadResultBlock.append(new Load(sign->getAddress()));
 
                         InstructionList &negativeSignBlock = *new InstructionList();
-                        negativeSignBlock.append(new Load(divisor->getAddress()));
+                        negativeSignBlock.append(new Load(divisor->getAddress()))
+                                .append(new Jzero(instructionList.end()));
 
                         InstructionList &aNegative = *new InstructionList();
                         aNegative.append(new Sub(remain->getAddress()))
@@ -508,7 +582,8 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                                 .append(aNegative);
 
                         InstructionList &positiveSignBlock = *new InstructionList();
-                        positiveSignBlock.append(new Load(divisor->getAddress()));
+                        positiveSignBlock.append(new Load(divisor->getAddress()))
+                                .append(new Jzero(instructionList.end()));
 
                         InstructionList &bothNegativeBlock = *new InstructionList();
                         bothNegativeBlock.append(new Sub(primaryAccumulator))
@@ -834,7 +909,8 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                     instructionList,
                     tempVars + lhsResolution->temporaryVars + rhsResolution->temporaryVars
             );
-        } catch (std::bad_cast ee) {}
+        } catch (std::bad_cast
+                 ee) {}
     }
 }
 

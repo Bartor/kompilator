@@ -24,7 +24,7 @@ bool PeepholeOptimizer::removeUselessStoreLoads() {
                     bool canRemove = true;
                     for (int j = 0; j < instructions.getInstructions().size(); j++) {
                         if (auto jumpInstruction = dynamic_cast<Jump *>(instructions.getInstructions()[j])) {
-                            if (jumpInstruction->target->getAddress() == loadInstruction->getAddress() || jumpInstruction->target->getAddress() == storeInstruction->getAddress()) {
+                            if (jumpInstruction->target->getAddress() == loadInstruction->getAddress()) {
                                 canRemove = false;
                                 break;
                             }
