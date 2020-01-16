@@ -25,7 +25,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    bool optimize = argc < 4 ? false : atoi(argv[3]) != 0;
+    std::cout << argv << std::endl;
+    bool optimize = false, verbose = false;
+    for (int i = 0; i < argc; i++) {
+        if (argv[i][0] == '-' && argv[i][1] == 'v') verbose = true;
+        if (argv[i][0] == '-' && argv[i][1] == 'o') optimize = true;
+    }
     std::cout << "- Analyzing file " << argv[1] << (optimize ? " with optimization -" : " without optimization -") << std::endl;
 
     std::cout << "- Parsing -" << std::endl;
@@ -40,16 +45,16 @@ int main(int argc, char **argv) {
 
     Program *program = new Program(*declarations, *commands, *constants);
 
-    std::cout << "-=- A S T -=-" << std::endl;
-    std::cout << program->toString() << std::endl;
+    if (verbose)std::cout << "-=- A S T -=-" << std::endl;
+    if (verbose) std::cout << program->toString() << std::endl;
 
     if (optimize) {
         std::cout << "- AST Optimization -" << std::endl;
         ASTOptimizer *astOptimizer = new ASTOptimizer(program);
         astOptimizer->optimize();
 
-        std::cout << "-=- OPTIMIZED A S T -=-" << std::endl;
-        std::cout << program->toString() << std::endl;
+        if (verbose) std::cout << "-=- OPTIMIZED A S T -=-" << std::endl;
+        if (verbose) std::cout << program->toString() << std::endl;
     }
 
     AbstractAssembler *assembler = new AbstractAssembler(*program);
@@ -59,15 +64,14 @@ int main(int argc, char **argv) {
     try {
         InstructionList &assembled = assembler->assemble();
 
-        std::cout << std::endl << "-=- A S M -=-" << std::endl;
+        if (verbose) std::cout << std::endl << "-=- A S M -=-" << std::endl;
 
         std::ofstream output;
         output.open(argv[2] ? argv[2] : "a.out");
 
-
         for (const auto &ins : assembled.getInstructions()) {
             if (!ins->stub) {
-                std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
+                if (verbose) std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
                 if (!optimize) output << ins->toAssemblyCode(true) << std::endl;
             }
         }
@@ -79,11 +83,11 @@ int main(int argc, char **argv) {
             peepholeOptimizer->optimize();
             assembled.seal(false);
 
-            std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
+            if (verbose) std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
 
             for (const auto &ins : assembled.getInstructions()) {
                 if (!ins->stub) {
-                    std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
+                    if (verbose) std::cout << std::setbase(10) << ins->getAddress() << ": " << ins->toAssemblyCode(true) << std::endl;
                     output << ins->toAssemblyCode(true) << std::endl;
                 }
             }
