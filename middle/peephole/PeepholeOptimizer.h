@@ -26,7 +26,7 @@ private:
 public:
     PeepholeOptimizer(InstructionList &instructionList) : instructions(instructionList) {}
 
-    void optimize();
+    void optimize(bool verbose);
 };
 
 #endif //COMPILER_PEEPHOLEOPTIMIZER_H

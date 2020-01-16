@@ -25,33 +25,36 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    std::cout << argv << std::endl;
     bool optimize = false, verbose = false;
     for (int i = 0; i < argc; i++) {
         if (argv[i][0] == '-' && argv[i][1] == 'v') verbose = true;
         if (argv[i][0] == '-' && argv[i][1] == 'o') optimize = true;
     }
-    std::cout << "- Analyzing file " << argv[1] << (optimize ? " with optimization -" : " without optimization -") << std::endl;
 
-    std::cout << "- Parsing -" << std::endl;
+    std::cout << "[i] Compiling file " << argv[1] << (optimize ? " with optimization" : " without optimization") << std::endl;
+
+    std::cout << "[i] Parsing... ";
 
     yyin = source;
     yyparse();
 
-    std::cout << "Done" << std::endl;
+    std::cout << "done" << std::endl;
 
     if (commands == nullptr) commands = new CommandList();
     if (declarations == nullptr) declarations = new DeclarationList();
 
     Program *program = new Program(*declarations, *commands, *constants);
 
-    if (verbose)std::cout << "-=- A S T -=-" << std::endl;
+    if (verbose) std::cout << "-=- A S T -=-" << std::endl;
     if (verbose) std::cout << program->toString() << std::endl;
 
     if (optimize) {
-        std::cout << "- AST Optimization -" << std::endl;
+        std::cout << "[i] AST Optimization... ";
+        if (verbose) std::cout << std::endl;
         ASTOptimizer *astOptimizer = new ASTOptimizer(program);
-        astOptimizer->optimize();
+        astOptimizer->optimize(verbose);
+        if (verbose) std::cout << std::endl;
+        std::cout << "done" << std::endl;
 
         if (verbose) std::cout << "-=- OPTIMIZED A S T -=-" << std::endl;
         if (verbose) std::cout << program->toString() << std::endl;
@@ -59,10 +62,13 @@ int main(int argc, char **argv) {
 
     AbstractAssembler *assembler = new AbstractAssembler(*program);
 
-    std::cout << std::endl << "- Assembling -" << std::endl;
+    std::cout << "[i] Compiling... ";
+    if (verbose) std::cout << std::endl;
 
     try {
-        InstructionList &assembled = assembler->assemble();
+        InstructionList &assembled = assembler->assemble(verbose);
+
+        std::cout << "done" << std::endl;
 
         if (verbose) std::cout << std::endl << "-=- A S M -=-" << std::endl;
 
@@ -77,11 +83,15 @@ int main(int argc, char **argv) {
         }
 
         if (optimize) {
-            std::cout << "- ASM Optimization -" << std::endl;
+            std::cout << "[i] ASM Optimization... ";
+            if (verbose) std::cout << std::endl;
             PeepholeOptimizer *peepholeOptimizer = new PeepholeOptimizer(assembled);
 
-            peepholeOptimizer->optimize();
+            peepholeOptimizer->optimize(verbose);
             assembled.seal(false);
+
+            if (verbose) std::cout << std::endl;
+            std::cout << "done" << std::endl;
 
             if (verbose) std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
 
@@ -95,7 +105,7 @@ int main(int argc, char **argv) {
         }
 
     } catch (std::string errorMessage) {
-        std::cout << "=!= COMPILATION ERROR =!=" << std::endl << errorMessage << std::endl;
+        std::cout << std::endl << "[!] COMPILATION ERROR" << std::endl << errorMessage << std::endl;
         return 1;
     }
 

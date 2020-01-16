@@ -2,18 +2,19 @@
 
 std::string TEMPORARY_NAMES = "!TEMP";
 
-void AbstractAssembler::prepareConstants() {
+void AbstractAssembler::prepareConstants(bool verbose) {
     constants = new Constants(accumulatorNumber);
-    std::cout << "Adding 1 and -1 constants" << std::endl;
 
     Constant *resOne = constants->addConstant(1);
     Constant *resMinusOne = constants->addConstant(-1);
 
+    if (verbose) std::cout << resOne->toString() << std::endl << resMinusOne->toString() << std::endl;
+
     for (const auto num : program.constants.constants) {
         Constant *constantPointer = constants->addConstant(num);
 
-        if (constantPointer) {
-            std::cout << constantPointer->toString() + " at " << constantPointer->getAddress().getAddress() << std::endl;
+        if (constantPointer && verbose) {
+            std::cout << constantPointer->toString() << std::endl;
         }
     }
 }
@@ -30,7 +31,7 @@ InstructionList &AbstractAssembler::assembleConstants() {
     return list;
 }
 
-void AbstractAssembler::getVariablesFromDeclarations() {
+void AbstractAssembler::getVariablesFromDeclarations(bool verbose) {
     scopedVariables = new ScopedVariables(
             1 // next address...
             + accumulatorNumber // ...offset by accumulators...
@@ -42,11 +43,11 @@ void AbstractAssembler::getVariablesFromDeclarations() {
         if (auto numDecl = dynamic_cast<IdentifierDeclaration *>(declaration)) {
             NumberVariable *var = new NumberVariable(numDecl->name, *new ResolvableAddress());
             scopedVariables->pushVariableScope(var);
-            std::cout << var->toString() << " at " << var->getAddress().getAddress() << std::endl;
+            if (verbose) std::cout << var->toString() << std::endl;
         } else if (auto arrDecl = dynamic_cast<ArrayDeclaration *>(declaration)) {
             NumberArrayVariable *var = new NumberArrayVariable(arrDecl->name, *new ResolvableAddress(), arrDecl->start, arrDecl->end);
             scopedVariables->pushVariableScope(var);
-            std::cout << var->toString() << " at " << var->getAddress().getAddress() << std::endl;
+            if (verbose) std::cout << var->toString() << std::endl;
 
             // this is an array start address; it must be included in generated constants to use with indirect
             // variable addressing mode (e.g. a[b])
@@ -895,7 +896,9 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
                         VARIABLE_ARRAY,
                         true
                 );
-            } catch (std::bad_cast _) {}
+            } catch (std::bad_cast __) {
+                throw "Trying to use array identifier as variable";
+            }
         }
     } else throw "Variable resolution error";
 }
@@ -918,19 +921,17 @@ Resolution *AbstractAssembler::resolve(AbstractValue &value) {
         try {
             IdentifierValue &identifierValue = dynamic_cast<IdentifierValue &>(value);
             return resolve(identifierValue.identifier);
-        } catch (std::bad_cast _) {
+        } catch (std::bad_cast __) {
             throw "Value resolution error";
         }
     }
 }
 
-InstructionList &AbstractAssembler::assemble() {
-    getVariablesFromDeclarations();
-    prepareConstants();
+InstructionList &AbstractAssembler::assemble(bool verbose) {
+    getVariablesFromDeclarations(verbose);
+    prepareConstants(verbose);
     SimpleResolution *programCodeResolution = assembleCommands(program.commands);
-    std::cout << "Assembled programs returning " << programCodeResolution->temporaryVars << " temporary variables " << std::endl;
     InstructionList &instructions = assembleConstants();
-    std::cout << "Assembled pre-generated constants code" << std::endl;
     instructions.append(programCodeResolution->instructions);
     instructions.seal(true);
     return instructions;

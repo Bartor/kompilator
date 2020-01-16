@@ -78,12 +78,12 @@ private:
     /**
      * Adds variables declared in Program to scoped variables.
      */
-    void getVariablesFromDeclarations();
+    void getVariablesFromDeclarations(bool verbose);
 
     /**
      * Adds constants from Program as well as 1 and -1 to constants.
      */
-    void prepareConstants();
+    void prepareConstants(bool verbose);
 
     /**
      * Generates instruction list used to create and store constants
@@ -143,7 +143,7 @@ public:
      * Single-click assembly!
      * @return Ready instruction list (but with Stubs, for optimizations).
      */
-    InstructionList &assemble();
+    InstructionList &assemble(bool verbose);
 };
 
 #endif //COMPILER_ABSTRACTASSEMBLER_H

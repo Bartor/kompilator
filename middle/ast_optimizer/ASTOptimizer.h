@@ -69,10 +69,11 @@ private:
      * everywhere otherwise.
      */
     Callback iteratorReplacer(std::string &variableToReplace, long long value);
+
 public:
     ASTOptimizer(Program *program) : originalProgram(program) {}
 
-    void optimize();
+    void optimize(bool verbose);
 };
 
 #endif //COMPILER_ASTOPTIMIZER_H

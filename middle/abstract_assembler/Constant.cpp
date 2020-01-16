@@ -7,7 +7,7 @@ char *lltoa(unsigned long long val, int base) {
     int sign = (val < 0);
     if (sign) val = -val;
 
-    if (val == 0) return "0";
+    if (val == 0) return nullptr;
 
     for (; val && i; --i, val /= base) {
         buf[i] = "0123456789abcdef"[val % base];
@@ -60,5 +60,5 @@ ResolvableAddress &Constant::getAddress() {
 }
 
 std::string Constant::toString() {
-    return "Constant<" + std::to_string(value) + ">";
+    return "Constant<" + std::to_string(value) + ">#" + std::to_string(address.getAddress());
 }

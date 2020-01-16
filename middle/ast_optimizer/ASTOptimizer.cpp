@@ -79,14 +79,12 @@ Node *ASTOptimizer::constantLoopUnroller(Node *node) {
 
                 if (forNode->reversed) {
                     for (long long i = startConstant.value; i >= endConstant.value; i--) {
-                        std::cout << i << std::endl;
                         Callback replacer = iteratorReplacer(forNode->variableName, i);
                         originalProgram->constants.constants.push_back(i);
                         cmdList->append(*static_cast<CommandList *>(forNode->commands.copy(replacer)));
                     }
                 } else {
                     for (long long i = startConstant.value; i <= endConstant.value; i++) {
-                        std::cout << i << std::endl;
                         Callback replacer = iteratorReplacer(forNode->variableName, i);
                         originalProgram->constants.constants.push_back(i);
                         cmdList->append(*static_cast<CommandList *>(forNode->commands.copy(replacer)));
@@ -125,11 +123,11 @@ Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long lon
     };
 }
 
-void ASTOptimizer::optimize() {
+void ASTOptimizer::optimize(bool verbose) {
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); })) {
-        std::cout << "Unrolling constant loops" << std::endl;
+        if (verbose) std::cout << std::endl << "Unrolling constant loops";
     }
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantExpressionOptimizer(node); })) {
-        std::cout << "Replacing constant expressions" << std::endl;
+        if (verbose) std::cout << std::endl << "Replacing constant expressions";
     }
 }

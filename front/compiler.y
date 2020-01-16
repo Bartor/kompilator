@@ -195,6 +195,6 @@ identifier:
 
 
 void yyerror(const char *s) {
-  std::cout << "PARSING ERROR: " << s << " at line " << yylineno << ": '" << yytext << "'" <<std::endl;
+  std::cout << "[!] PARSING ERROR @ " << yylineno << std::endl << s << std::endl;
   exit(1);
 }
