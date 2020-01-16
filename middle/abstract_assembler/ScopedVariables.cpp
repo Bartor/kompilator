@@ -23,7 +23,9 @@ void ScopedVariables::popVariableScope(long long times) {
 
 Variable *ScopedVariables::resolveVariable(std::string &name) {
     for (const auto &variable : variables) {
-        if (variable->name == name) return variable;
+        if (dynamic_cast<TemporaryVariable *>(variable) == nullptr) {
+            if (variable->name == name) return variable;
+        }
     }
     throw "No variable in current scope: " + name;
 }
