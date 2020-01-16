@@ -58,6 +58,15 @@ private:
     Node *constantLoopUnroller(Node *node);
 
     /**
+     * Searches for condtions which always hold or always fail
+     * and removes them/warns about them
+     * @param node Node to be checked.
+     * @return Original node, if there were no constant condition in it;
+     * (possibly empty) instruction list otherwise.
+     */
+    Node *constantConditionRemover(Node *node);
+
+    /**
      * A copy-callback replacer which replaces each use of some
      * variable by a number value, e.g.
      * a ASSIGN i PLUS 1 ==> a ASSIGN 10 PLUS 1

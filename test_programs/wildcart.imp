@@ -1,8 +1,8 @@
 DECLARE
-    a, b
+    a
 BEGIN
     READ a;
-    IF -4 NEQ a THEN
-        WRITE 1;
+    IF a NEQ a THEN
+        WRITE a;
     ENDIF
 END

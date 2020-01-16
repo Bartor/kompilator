@@ -1,5 +1,95 @@
 #include "ASTOptimizer.h"
 
+Callback identity = [](Node *node) -> Node * { return node; };
+
+enum ConditionState {
+    NEVER,
+    SOMETIMES,
+    ALWAYS
+};
+
+ConditionState checkTautology(Condition &condition) {
+    try {
+        NumberValue &lVal = dynamic_cast<NumberValue &>(condition.lhs);
+        NumberValue &rVal = dynamic_cast<NumberValue &>(condition.rhs);
+
+        switch (condition.type) {
+            case EQUAL:
+                return lVal.value == rVal.value ? ALWAYS : NEVER;
+            case NOT_EQUAL:
+                return lVal.value != rVal.value ? ALWAYS : NEVER;
+            case LESS:
+                return lVal.value < rVal.value ? ALWAYS : NEVER;
+            case GREATER:
+                return lVal.value > rVal.value ? ALWAYS : NEVER;
+            case LESS_OR_EQUAL:
+                return lVal.value <= rVal.value ? ALWAYS : NEVER;
+            case GREATER_OR_EQUAL:
+                return lVal.value >= rVal.value ? ALWAYS : NEVER;
+        }
+    } catch (std::bad_cast _) {
+        try {
+            IdentifierValue &lVal = dynamic_cast<IdentifierValue &>(condition.lhs);
+            IdentifierValue &rVal = dynamic_cast<IdentifierValue &>(condition.rhs);
+
+            try {
+                VariableIdentifier &lValId = dynamic_cast<VariableIdentifier &>(lVal.identifier);
+                VariableIdentifier &rValId = dynamic_cast<VariableIdentifier &>(rVal.identifier);
+
+                if (lValId.name == rValId.name) {
+                    switch (condition.type) {
+                        case EQUAL:
+                        case LESS_OR_EQUAL:
+                        case GREATER_OR_EQUAL:
+                            return ALWAYS;
+                        case NOT_EQUAL:
+                        case LESS:
+                        case GREATER:
+                            return NEVER;
+                    }
+                } else return SOMETIMES;
+            } catch (std::bad_cast _) {
+                try {
+                    AccessIdentifier &lValAcc = dynamic_cast<AccessIdentifier &>(lVal.identifier);
+                    AccessIdentifier &rValAcc = dynamic_cast<AccessIdentifier &>(rVal.identifier);
+
+                    if (lValAcc.name == rValAcc.name && lValAcc.index == rValAcc.index) {
+                        switch (condition.type) {
+                            case EQUAL:
+                            case LESS_OR_EQUAL:
+                            case GREATER_OR_EQUAL:
+                                return ALWAYS;
+                            case NOT_EQUAL:
+                            case LESS:
+                            case GREATER:
+                                return NEVER;
+                        }
+                    } else return SOMETIMES;
+                } catch (std::bad_cast) {
+                    try {
+                        VariableAccessIdentifier &lValVarAcc = dynamic_cast<VariableAccessIdentifier &>(lVal.identifier);
+                        VariableAccessIdentifier &rValVarAcc = dynamic_cast<VariableAccessIdentifier &>(rVal.identifier);
+
+                        if (lValVarAcc.name == rValVarAcc.name && lValVarAcc.accessName == rValVarAcc.accessName) {
+                            switch (condition.type) {
+                                case EQUAL:
+                                case LESS_OR_EQUAL:
+                                case GREATER_OR_EQUAL:
+                                    return ALWAYS;
+                                case NOT_EQUAL:
+                                case LESS:
+                                case GREATER:
+                                    return NEVER;
+                            }
+                        } else return SOMETIMES;
+                    } catch (std::bad_cast _) {}
+                }
+            }
+        } catch (std::bad_cast _) {}
+    }
+    return SOMETIMES;
+}
+
 bool ASTOptimizer::traverse(CommandList &commandList, Callback callback) {
     bool changed = false;
     for (int i = 0; i < commandList.commands.size(); i++) {
@@ -96,6 +186,29 @@ Node *ASTOptimizer::constantLoopUnroller(Node *node) {
     return node;
 }
 
+Node *ASTOptimizer::constantConditionRemover(Node *node) {
+    if (auto whileNode = dynamic_cast<While *>(node)) {
+        if (checkTautology(whileNode->condition) == ALWAYS) {
+            return whileNode->commands.copy(identity);
+        } else if (checkTautology(whileNode->condition) == NEVER) {
+            return new CommandList();
+        }
+    } else if (auto ifNode = dynamic_cast<If *>(node)) {
+        if (checkTautology(ifNode->condition) == ALWAYS) {
+            return ifNode->commands.copy(identity);
+        } else if (checkTautology(ifNode->condition) == NEVER) {
+            return new CommandList();
+        }
+    } else if (auto ifElseNode = dynamic_cast<IfElse *>(node)) {
+        if (checkTautology(ifElseNode->condition) == ALWAYS) {
+            return ifElseNode->commands.copy(identity);
+        } else if (checkTautology(ifElseNode->condition) == NEVER) {
+            return ifElseNode->elseCommands.copy(identity);
+        }
+    }
+    return node;
+}
+
 Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long long value) {
     return [this, variableToReplace, value](Node *node) -> Node * {
         if (auto idVal = dynamic_cast<IdentifierValue *>(node)) {
@@ -122,6 +235,10 @@ Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long lon
 }
 
 void ASTOptimizer::optimize(bool verbose) {
+    while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantConditionRemover(node); })) {
+        if (verbose) std::cout << std::endl << "Flattening always true expressions";
+    }
+
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); })) {
         if (verbose) std::cout << std::endl << "Unrolling constant loops";
     }
