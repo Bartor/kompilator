@@ -684,10 +684,10 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
 
                     if (incResolved) break;
 
-                    TemporaryVariable *negativeATemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    TemporaryVariable *negativeBTemp = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
-                    scopedVariables->pushVariableScope(negativeATemp);
-                    scopedVariables->pushVariableScope(negativeBTemp);
+                    TemporaryVariable *temporaryA = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    TemporaryVariable *temporaryB = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
+                    scopedVariables->pushVariableScope(temporaryA);
+                    scopedVariables->pushVariableScope(temporaryB);
 
                     TemporaryVariable *copiedA = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
                     TemporaryVariable *copiedB = new TemporaryVariable(TEMPORARY_NAMES, *new ResolvableAddress());
@@ -703,75 +703,124 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
 
                     InstructionList &whileBlock = *new InstructionList();
                     whileBlock.append(new Load(copiedA->getAddress()))
-                            .append(new Jzero(whileBlock.end()))
+                            .append(new Jzero(whileBlock.end())) // while (a != 0)
                             .append(new Shift(constants->getConstant(-1)->getAddress()))
                             .append(new Shift(constants->getConstant(1)->getAddress()))
-                            .append(new Sub(copiedA->getAddress()));
+                            .append(new Sub(copiedA->getAddress())); // bit check - a & 1
 
                     InstructionList &afterIfBlock = *new InstructionList();
                     afterIfBlock.append(new Load(copiedA->getAddress()))
                             .append(new Shift(constants->getConstant(-1)->getAddress()))
-                            .append(new Store(copiedA->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // a = a << 1
                             .append(new Load(copiedB->getAddress()))
                             .append(new Shift(constants->getConstant(1)->getAddress()))
-                            .append(new Store(copiedB->getAddress()))
-                            .append(new Jump(whileBlock.start()));
+                            .append(new Store(copiedB->getAddress())) // b = b >> 1
+                            .append(new Jump(whileBlock.start())); // continue while
 
-                    whileBlock.append(new Jzero(afterIfBlock.start()));
+                    whileBlock.append(new Jzero(afterIfBlock.start())); // if bit check failed, skip if
 
                     InstructionList &ifBlock = *new InstructionList();
                     ifBlock.append(new Load(expressionAccumulator))
                             .append(new Add(copiedB->getAddress()))
-                            .append(new Store(expressionAccumulator));
+                            .append(new Store(expressionAccumulator)); // inside bit bit check if, result = result + b
 
                     whileBlock.append(ifBlock)
                             .append(afterIfBlock);
 
                     InstructionList &initBlock = *new InstructionList();
                     initBlock.append(new Sub(primaryAccumulator))
-                            .append(new Store(expressionAccumulator))
+                            .append(new Store(expressionAccumulator)) // reset result
                             .append(aResolution->instructions)
                             .append(aResolution->indirect ? static_cast<Instruction * >(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(aResolution->address)))
-                            .append(new Jzero(loadResultBlock.start()));
+                            .append(new Jzero(loadResultBlock.start())); // skip algorithm, if a was zero
 
                     InstructionList &aLessThanZeroBlock = *new InstructionList();
-                    aLessThanZeroBlock.append(new Store(negativeATemp->getAddress()))
+                    aLessThanZeroBlock.append(new Store(temporaryA->getAddress()))
                             .append(bResolution->instructions)
                             .append(bResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(bResolution->address)))
-                            .append(new Jzero(loadResultBlock.start()));
+                            .append(new Jzero(loadResultBlock.start())) // skip algorithm, if b was zero
+                            .append(new Store(temporaryB->getAddress())); // save it for now for swaps
 
                     InstructionList &aAndBLessThanZeroBlock = *new InstructionList();
-                    if (bResolution->indirect) {
-                        aAndBLessThanZeroBlock.append(new Store(negativeBTemp->getAddress()))
-                                .append(new Sub(negativeBTemp->getAddress()))
-                                .append(new Sub(negativeBTemp->getAddress()))
-                                .append(new Store(copiedB->getAddress()));
-                    } else {
-                        aAndBLessThanZeroBlock.append(new Sub(bResolution->address))
-                                .append(new Sub(bResolution->address))
-                                .append(new Store(copiedB->getAddress()));
-                    }
-                    aAndBLessThanZeroBlock.append(new Sub(primaryAccumulator))
-                            .append(new Sub(negativeATemp->getAddress()))
-                            .append(new Store(copiedA->getAddress()))
+                    aAndBLessThanZeroBlock.append(new Sub(temporaryA->getAddress())); // a, b < 0, so b - a > 0 ==> abs(a) > abs(b), swap them!
+
+                    InstructionList &aAndBNegativeSwap = *new InstructionList();
+                    aAndBNegativeSwap.append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryA->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // b = -a
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryB->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // a = -b
+                            .append(new Jump(whileBlock.start()));
+
+                    aAndBLessThanZeroBlock.append(new Jneg(aAndBNegativeSwap.end()))
+                            .append(aAndBNegativeSwap)
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryA->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // a = -a
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryB->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // b = -b
+                            .append(new Jump(whileBlock.start()));
+
+                    InstructionList &aNegativeBPositiveSwap = *new InstructionList();
+                    aNegativeBPositiveSwap.append(new Load(temporaryA->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // a = b
+                            .append(new Load(temporaryB->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // b = a
                             .append(new Jump(whileBlock.start()));
 
                     aLessThanZeroBlock.append(new Jneg(aAndBLessThanZeroBlock.start()))
-                            .append(new Store(copiedA->getAddress()))
-                            .append(new Load(negativeATemp->getAddress()))
+                            .append(new Add(temporaryA->getAddress()))
+                            .append(new Jpos(aNegativeBPositiveSwap.end()))
+                            .append(aNegativeBPositiveSwap)
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryA->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // a = -a
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryB->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // b = -b
+                            .append(new Jump(whileBlock.start()))
+                            .append(aAndBLessThanZeroBlock);
+
+                    Resolution *newBResolution = resolve(binaryExpression.rhs);
+                    initBlock.append(new Jneg(aLessThanZeroBlock.start())) // go to negative a block
+                            .append(new Store(copiedA->getAddress())) // or just store a
+                            .append(newBResolution->instructions)
+                            .append(newBResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(newBResolution->address)))
+                            .append(new Jzero(loadResultBlock.start())) // skip algorithm, if b = 0
+                            .append(new Store(temporaryB->getAddress())); // store in temporary for now, because when a > b, b * a is faster than a * b
+
+                    InstructionList &storeBSwapEnd = *new InstructionList();
+                    storeBSwapEnd.append(new Load(temporaryB->getAddress()))
                             .append(new Store(copiedB->getAddress()))
                             .append(new Jump(whileBlock.start()));
 
-                    Resolution *newBResolution = resolve(binaryExpression.rhs);
-                    initBlock.append(new Jneg(aLessThanZeroBlock.start()))
-                            .append(new Store(copiedA->getAddress()))
-                            .append(newBResolution->instructions)
-                            .append(newBResolution->indirect ? static_cast<Instruction *>(new Loadi(primaryAccumulator)) : static_cast<Instruction *>(new Load(newBResolution->address)))
-                            .append(new Jzero(loadResultBlock.start()))
-                            .append(new Store(copiedB->getAddress()))
+                    InstructionList &positiveANegativeBSwapBlock = *new InstructionList();
+                    positiveANegativeBSwapBlock.append(new Add(copiedA->getAddress()))
+                            .append(new Jneg(storeBSwapEnd.start())) // just store b, it's abs bigger than a
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(copiedA->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // a = -b
+                            .append(new Sub(primaryAccumulator))
+                            .append(new Sub(temporaryB->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // b = -a
+                            .append(new Jump(whileBlock.start()));
+
+                    InstructionList &positiveASwapBlock = *new InstructionList();
+                    positiveASwapBlock.append(new Jneg(positiveANegativeBSwapBlock.start()))
+                            .append(new Sub(copiedA->getAddress()))
+                            .append(new Jpos(storeBSwapEnd.start())) // just store b, it's abs bigger than a
+                            .append(new Load(copiedA->getAddress()))
+                            .append(new Store(copiedB->getAddress())) // a = b
+                            .append(new Load(temporaryB->getAddress()))
+                            .append(new Store(copiedA->getAddress())) // b = a
                             .append(new Jump(whileBlock.start()))
-                            .append(aLessThanZeroBlock)
-                            .append(aAndBLessThanZeroBlock);
+                            .append(positiveANegativeBSwapBlock)
+                            .append(storeBSwapEnd);
+
+                    initBlock.append(positiveASwapBlock)
+                            .append(aLessThanZeroBlock);
 
                     instructionList.append(initBlock)
                             .append(whileBlock)
