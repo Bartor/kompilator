@@ -1,9 +1,11 @@
 #include "PeepholeOptimizer.h"
 
 void PeepholeOptimizer::optimize(bool verbose) {
+    std::cout << "   [i] Removing useless STORE LOADs..." << std::endl;
     while (removeUselessStoreLoads()) {
         if (verbose) std::cout << std::endl << "Removed useless STORE LOAD";
     }
+    std::cout << "   [i] Removing useless STORE LOADIs..." << std::endl;
     while (removeUselessStoreLoadis()) {
         if (verbose) std::cout << std::endl << "Removed useless STORE LOADI";
     }

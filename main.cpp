@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "front/ast/node.h"
 #include "middle/abstract_assembler/AbstractAssembler.h"
 #include "middle/ast_optimizer/ASTOptimizer.h"
@@ -14,14 +15,16 @@ extern int yyparse();
 extern FILE *yyin;
 
 int main(int argc, char **argv) {
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
     if (argc < 2) {
-        std::cerr << "Usage: compiler <source> [destination] [optimize=(0|1)]" << std::endl;
+        std::cerr << "[i] Usage: compiler <source> [destination] [optimize=(0|1)]" << std::endl;
         return 1;
     }
 
     FILE *source = fopen(argv[1], "r");
     if (!source) {
-        std::cerr << "Can't open " << argv[1] << std::endl;
+        std::cerr << "[e] Can't open " << argv[1] << std::endl;
         return 1;
     }
 
@@ -33,12 +36,12 @@ int main(int argc, char **argv) {
 
     std::cout << "[i] Compiling file " << argv[1] << (optimize ? " with optimization" : " without optimization") << std::endl;
 
-    std::cout << "[i] Parsing... ";
+    std::cout << "[i] Parsing... " << std::endl;
 
     yyin = source;
     yyparse();
 
-    std::cout << "done" << std::endl;
+    std::cout << "   [i] done" << std::endl;
 
     if (commands == nullptr) commands = new CommandList();
     if (declarations == nullptr) declarations = new DeclarationList();
@@ -49,12 +52,12 @@ int main(int argc, char **argv) {
     if (verbose) std::cout << program->toString() << std::endl;
 
     if (optimize) {
-        std::cout << "[i] AST Optimization... ";
+        std::cout << "[i] AST Optimization... " << std::endl;
         if (verbose) std::cout << std::endl;
         ASTOptimizer *astOptimizer = new ASTOptimizer(program);
         astOptimizer->optimize(verbose);
         if (verbose) std::cout << std::endl;
-        std::cout << "done" << std::endl;
+        std::cout << "   [i] done" << std::endl;
 
         if (verbose) std::cout << "-=- OPTIMIZED A S T -=-" << std::endl;
         if (verbose) std::cout << program->toString() << std::endl;
@@ -62,13 +65,13 @@ int main(int argc, char **argv) {
 
     AbstractAssembler *assembler = new AbstractAssembler(*program);
 
-    std::cout << "[i] Compiling... ";
+    std::cout << "[i] Compiling... " << std::endl;
     if (verbose) std::cout << std::endl;
 
     try {
         InstructionList &assembled = assembler->assemble(verbose);
 
-        std::cout << "done" << std::endl;
+        std::cout << "   [i] done" << std::endl;
 
         if (verbose) std::cout << std::endl << "-=- A S M -=-" << std::endl;
 
@@ -83,7 +86,7 @@ int main(int argc, char **argv) {
         }
 
         if (optimize) {
-            std::cout << "[i] ASM Optimization... ";
+            std::cout << "[i] ASM Optimization... " << std::endl;
             if (verbose) std::cout << std::endl;
             PeepholeOptimizer *peepholeOptimizer = new PeepholeOptimizer(assembled);
 
@@ -91,7 +94,7 @@ int main(int argc, char **argv) {
             assembled.seal(false);
 
             if (verbose) std::cout << std::endl;
-            std::cout << "done" << std::endl;
+            std::cout << "   [i] done" << std::endl;
 
             if (verbose) std::cout << std::endl << "-=- OPTIMIZED A S M -=-" << std::endl;
 
@@ -104,8 +107,11 @@ int main(int argc, char **argv) {
             output.close();
         }
 
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        std::cout << "[i] Compiled successfully in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms" << std::endl;
+
     } catch (std::string errorMessage) {
-        std::cout << std::endl << "[!] COMPILATION ERROR" << std::endl << errorMessage << std::endl;
+        std::cout << std::endl << "   [e] COMPILATION ERROR" << std::endl << errorMessage << std::endl;
         return 1;
     }
 

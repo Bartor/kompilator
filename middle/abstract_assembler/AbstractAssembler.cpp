@@ -444,7 +444,34 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                     modulo = true;
                 case DIVISION: {
                     bool incResolved = false;
-                    if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) { // know constants optimization
+                    if (rhsResolution->address.getAddress() == lhsResolution->address.getAddress()) { // if they are the same thing, return 1 or -1
+                        incResolved = true;
+                        if (modulo) {
+                            instructionList.append(new Sub(primaryAccumulator));
+                        } else {
+                            if (rhsResolution->type == CONSTANT) {
+                                NumberValue &numberValue = dynamic_cast<NumberValue &>(binaryExpression.rhs);
+
+                                instructionList.append(new Sub(primaryAccumulator));
+                                if (numberValue.value > 0) {
+                                    instructionList.append(new Inc());
+                                }
+                                if (numberValue.value != 0) {
+                                    instructionList.append(new Dec());
+                                }
+                            } else {
+                                Sub *resetAccToZero = new Sub(primaryAccumulator);
+
+                                instructionList.append(rhsResolution->instructions)
+                                        .append(rhsLoad)
+                                        .append(new Jzero(resetAccToZero))
+                                        .append(new Sub(primaryAccumulator))
+                                        .append(new Inc())
+                                        .append(new Jump(instructionList.end()))
+                                        .append(resetAccToZero);
+                            }
+                        }
+                    } else if (rhsResolution->type == CONSTANT || lhsResolution->type == CONSTANT) { // know constants optimization
                         bool rhsFlag = rhsResolution->type == CONSTANT;
 
                         NumberValue &constantValue = dynamic_cast<NumberValue &>(rhsFlag ? binaryExpression.rhs : binaryExpression.lhs);
@@ -563,7 +590,9 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
 
                     InstructionList &loadResultBlock = *new InstructionList();
                     if (modulo) {
-                        loadResultBlock.append(new Load(sign->getAddress()));
+                        loadResultBlock.append(new Load(remain->getAddress()))
+                                .append(new Jzero(instructionList.end()))
+                                .append(new Load(sign->getAddress()));
 
                         InstructionList &negativeSignBlock = *new InstructionList();
                         negativeSignBlock.append(new Load(divisor->getAddress()))

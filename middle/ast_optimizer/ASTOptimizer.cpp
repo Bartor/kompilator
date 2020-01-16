@@ -189,7 +189,8 @@ Node *ASTOptimizer::constantLoopUnroller(Node *node) {
 Node *ASTOptimizer::constantConditionRemover(Node *node) {
     if (auto whileNode = dynamic_cast<While *>(node)) {
         if (checkTautology(whileNode->condition) == ALWAYS) {
-            return whileNode->commands.copy(identity);
+            std::cout << "  |[w] Infinite loop detected" << std::endl;
+            return node;
         } else if (checkTautology(whileNode->condition) == NEVER) {
             return new CommandList();
         }
@@ -236,13 +237,13 @@ Callback ASTOptimizer::iteratorReplacer(std::string &variableToReplace, long lon
 
 void ASTOptimizer::optimize(bool verbose) {
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantConditionRemover(node); })) {
-        if (verbose) std::cout << std::endl << "Flattening always true expressions";
+        std::cout << "   [i] flattening always true expressions" << std::endl;
     }
 
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantLoopUnroller(node); })) {
-        if (verbose) std::cout << std::endl << "Unrolling constant loops";
+        std::cout << "   [i] unrolling constant loops" << std::endl;
     }
     while (traverse(originalProgram->commands, [this](Node *node) -> Node * { return constantExpressionOptimizer(node); })) {
-        if (verbose) std::cout << std::endl << "Replacing constant expressions";
+        std::cout << "   [i] Replacing constant expressions" << std::endl;
     }
 }

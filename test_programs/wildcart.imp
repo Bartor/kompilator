@@ -2,7 +2,7 @@ DECLARE
     a
 BEGIN
     READ a;
-    IF a NEQ a THEN
+    WHILE a NEQ a DO
         WRITE a;
-    ENDIF
+    ENDWHILE
 END
