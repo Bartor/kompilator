@@ -1,0 +1,30 @@
+[ div-mod.imp 
+  33 7
+  4 5 -5 -2 4 -5 -5 2
+]
+DECLARE
+	a, b, c
+BEGIN
+	READ a;
+	READ b;
+	c ASSIGN a DIV b;
+	WRITE c;
+	c ASSIGN a MOD b;
+	WRITE c;
+	b ASSIGN 0 MINUS b;
+	c ASSIGN a DIV b;
+	WRITE c;
+	c ASSIGN a MOD b;
+	WRITE c;
+	a ASSIGN 0 MINUS a;
+	c ASSIGN a DIV b;
+	WRITE c;
+	c ASSIGN a MOD b;
+	WRITE c;
+	b ASSIGN 0 MINUS b;
+	c ASSIGN a DIV b;
+	WRITE c;
+	c ASSIGN a MOD b;
+	WRITE c;
+END
+
