@@ -29,12 +29,3 @@ Variable *ScopedVariables::resolveVariable(std::string &name) {
     }
     throw "No variable in current scope: " + name;
 }
-
-ResolvableAddress &ScopedVariables::resolveAddress(AbstractIdentifier &identifier) {
-    Variable *resolved = resolveVariable(identifier.name);
-
-    if (resolved == nullptr) {
-        throw "No variable in current scope: " + identifier.toString(0);
-    }
-    return resolved->getAddress();
-}

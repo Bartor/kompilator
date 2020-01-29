@@ -1,0 +1,7 @@
+[ Błąd w linii 3: niewłaściwy zakres tablicy b ]
+DECLARE
+  a, b(11:10)
+BEGIN
+  b(10) ASSIGN 1;
+  a ASSIGN b(11);
+END

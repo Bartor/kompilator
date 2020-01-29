@@ -111,7 +111,12 @@ int main(int argc, char **argv) {
         std::cout << "[i] Compiled successfully in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms" << std::endl;
 
     } catch (std::string errorMessage) {
-        std::cout << std::endl << "   [e] COMPILATION ERROR" << std::endl << errorMessage << std::endl;
+        std::cout << "   [e] " << errorMessage << std::endl;
+        std::cout << "[e] Aborting" << std::endl;
+        return 1;
+    } catch (char const *errorMessage) {
+        std::cout << "   [e] " << errorMessage << std::endl;
+        std::cout << "[e] Aborting" << std::endl;
         return 1;
     }
 

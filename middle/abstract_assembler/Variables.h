@@ -12,6 +12,7 @@ class Variable {
 private:
     ResolvableAddress &address;
 public:
+    bool initialized = false;
     std::string &name;
     long long size;
     bool readOnly;
@@ -47,11 +48,15 @@ class NumberArrayVariable : public Variable {
 public:
     long long start;
     long long end;
+    bool warned = false;
 
     NumberArrayVariable(std::string &name, ResolvableAddress &address, long long start, long long end,
                         bool readOnly = false)
             : Variable(name, address, readOnly), start(start), end(end) {
         size = end - start + 1;
+        if (end < start) {
+            throw "Trying to declare an array " + name + " starting at " + std::to_string(start) + " and ending at " + std::to_string(end);
+        }
     }
 
     virtual std::string toString();
@@ -65,6 +70,8 @@ public:
  */
 class TemporaryVariable : public Variable {
 public:
+    bool initialized = true;
+
     TemporaryVariable(std::string &name, ResolvableAddress &address)
             : Variable(name, address, true) {
         size = 1;

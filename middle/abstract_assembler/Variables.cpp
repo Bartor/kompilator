@@ -5,13 +5,13 @@ ResolvableAddress &Variable::getAddress() {
 }
 
 std::string NumberVariable::toString() {
-    return "NumberVariable<" + name + ">#" + std::to_string(getAddress().getAddress());
+    return "NumberVariable<" + name + ">";
 }
 
 std::string NumberArrayVariable::toString() {
-    return "NumberArrayVariable<" + name + ">[" + std::to_string(start) + ", " + std::to_string(end) + "]#" + std::to_string(getAddress().getAddress());
+    return "NumberArrayVariable<" + name + ">[" + std::to_string(start) + ", " + std::to_string(end) + "]";
 }
 
 std::string TemporaryVariable::toString() {
-    return "TemporaryVariable<" + name + ">#" + std::to_string(getAddress().getAddress());
+    return "TemporaryVariable<" + name + ">";
 }

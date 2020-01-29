@@ -134,7 +134,7 @@ private:
      * @param identifier An identifier we need to load.
      * @return A resolution object with information needed to load it.
      */
-    Resolution *resolve(AbstractIdentifier &identifier);
+    Resolution *resolve(AbstractIdentifier &identifier, bool checkInit);
 
 public:
     AbstractAssembler(Program &program) : program(program) {}

@@ -1,5 +1,6 @@
 # Kompilator
 
+Autor: Bartosz Barnaba Rajczyk
 Zadanie zaliczeniowe laboratorium kursu Języki Formalne i Techniki Translacji prowadzonego w semestrze zimowym 2019/2020 przez dr. Maćka Gębalę.
 
 W celu uruchomienia:
@@ -9,7 +10,7 @@ make
 ```
 a następinie
 ```bash
-./compiler [plik wejściowy] [plik wyjściowy - bez podania mamy "a.out"]
+./kompilator [plik wejściowy] [plik wyjściowy - bez podania mamy "a.out"]
 ```
 
 **DISCLAIMER**: program zaprezentowany w tym repozytorium jest moim *pierwszym* większym zderzeniem z C++ i prezentuje absolutnie *żałosny* jego poziom, z wyciekami pamięci, 

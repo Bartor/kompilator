@@ -29,13 +29,6 @@ public:
     void popVariableScope(long long times = 1);
 
     /**
-     * Resolves an address of some identifier.
-     * @param identifier Identifier we want to get address of.
-     * @return Address representing this identifier.
-     */
-    ResolvableAddress &resolveAddress(AbstractIdentifier &identifier);
-
-    /**
      * Resolves a whole variable (and not only its address).
      * @param name A name of a variable we want to resolve.
      */

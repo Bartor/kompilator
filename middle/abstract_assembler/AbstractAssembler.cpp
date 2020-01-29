@@ -69,7 +69,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
             instructions.append(assmebledCommands->instructions);
             tempVars += assmebledCommands->temporaryVars;
         } else if (auto readNode = dynamic_cast<Read *>(command)) { // READ
-            Resolution *idRes = resolve(readNode->identifier);
+            Resolution *idRes = resolve(readNode->identifier, false);
 
             if (!idRes->writable) throw "Trying to read to non-writable variable " + readNode->identifier.name;
 
@@ -97,7 +97,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
 
             tempVars += valRes->temporaryVars;
         } else if (auto assignNode = dynamic_cast<Assignment *>(command)) { // ASSIGN
-            Resolution *idRes = resolve(assignNode->identifier);
+            Resolution *idRes = resolve(assignNode->identifier, false);
 
             if (!idRes->writable) throw "Trying to assign to non-writable variable " + assignNode->identifier.name;
 
@@ -165,6 +165,7 @@ SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) 
                     *new ResolvableAddress(),
                     true
             );
+            iterator->initialized = true;
             scopedVariables->pushVariableScope(iterator); // create iterator BEFORE commands would use it
             tempVars += 1;
 
@@ -948,24 +949,35 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
  * @param identifier
  * @return
  */
-Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
+Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier, bool checkInit = true) {
     Variable *var = scopedVariables->resolveVariable(identifier.name);
+    if (checkInit && !var->initialized) {
+        std::cout << "   [w] Variable " << var->name << " may not have been initialized" << std::endl;
+    }
+    var->initialized = true; // assume it was initialized at this point
 
     if (auto numVar = dynamic_cast<NumberVariable *>(var)) {
-        return new Resolution(
-                *new InstructionList(),
-                numVar->getAddress(),
-                VARIABLE,
-                false,
-                0, // zero temp vars used
-                !numVar->readOnly // if it's readOnly, it's not writable -- used for iterators
-        );
+        try {
+            VariableIdentifier &varId = dynamic_cast<VariableIdentifier &>(identifier); // check if the identifier was actually a var id
+
+            return new Resolution(
+                    *new InstructionList(),
+                    numVar->getAddress(),
+                    VARIABLE,
+                    false,
+                    0, // zero temp vars used
+                    !numVar->readOnly // if it's readOnly, it's not writable -- used for iterators
+            );
+        } catch (std::bad_cast _) {
+            throw "Trying to access a number variable like an array";
+        }
     } else if (auto arrayVar = dynamic_cast<NumberArrayVariable *>(var)) {
         try { // ACCESS VALUE - a[0]
             AccessIdentifier &accId = dynamic_cast<AccessIdentifier &>(identifier);
 
-            if (accId.index < arrayVar->start || accId.index > arrayVar->end) {
-                throw "Trying to access " + arrayVar->toString() + " at index " + std::to_string(accId.index);
+            if ((accId.index < arrayVar->start || accId.index > arrayVar->end) && !arrayVar->warned) {
+                std::cout << "   [w] Trying to access " + arrayVar->toString() + " at index " + std::to_string(accId.index) << "; you won't be warned about this array anymore" << std::endl;
+                arrayVar->warned = true;
             }
 
             ResolvableAddress &address = *new ResolvableAddress(arrayVar->getAddress().getAddress()); // copy address
@@ -983,6 +995,11 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier) {
 
                 ResolvableAddress &startValueAddress = constants->getConstant(arrayVar->start)->getAddress(); // arr start
                 Variable *variable = scopedVariables->resolveVariable(varAccId.accessName); // "b" variable
+                if (!variable->initialized) {
+                    std::cout << "   [w] Variable " << variable->name << " may not have been initialized" << std::endl;
+                }
+                variable->initialized = true; // assume it was initialized at this point
+
                 ResolvableAddress &arrAddressAddress = constants->getConstant(arrayVar->getAddress().getAddress())->getAddress();
 
                 InstructionList &instructionList = *new InstructionList();
