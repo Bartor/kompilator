@@ -13,7 +13,7 @@ BEGIN
             potega ASSIGN potega PLUS 1;
             reszta ASSIGN n MOD dzielnik;
         ENDWHILE
-        IF potega GE 0 THEN
+        IF potega GE 0 THEN [ czy znaleziono dzielnik ]
             WRITE dzielnik;
             WRITE potega;
         ELSE
@@ -21,7 +21,7 @@ BEGIN
             m ASSIGN dzielnik TIMES dzielnik;
         ENDIF
     ENDWHILE
-    IF n NEQ 1 THEN
+    IF n NEQ 1 THEN [ ostatni dzielnik ]
         WRITE n;
         WRITE 1;
     ENDIF

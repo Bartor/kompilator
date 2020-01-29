@@ -28,10 +28,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    bool optimize = false, verbose = false;
+    bool optimize = true, verbose = false;
     for (int i = 0; i < argc; i++) {
         if (argv[i][0] == '-' && argv[i][1] == 'v') verbose = true;
-        if (argv[i][0] == '-' && argv[i][1] == 'o') optimize = true;
+        if (argv[i][0] == '-' && argv[i][1] == 'o') optimize = false;
     }
 
     std::cout << "[i] Compiling file " << argv[1] << (optimize ? " with optimization" : " without optimization") << std::endl;
