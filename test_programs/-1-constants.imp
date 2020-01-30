@@ -1,0 +1,6 @@
+BEGIN
+    WRITE 15;
+    WRITE -15;
+    WRITE 29;
+    WRITE 31;
+END

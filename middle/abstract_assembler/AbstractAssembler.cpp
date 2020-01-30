@@ -5,11 +5,6 @@ std::string TEMPORARY_NAMES = "!TEMP";
 void AbstractAssembler::prepareConstants(bool verbose) {
     constants = new Constants(accumulatorNumber);
 
-    Constant *resOne = constants->addConstant(1);
-    Constant *resMinusOne = constants->addConstant(-1);
-
-    if (verbose) std::cout << resOne->toString() << std::endl << resMinusOne->toString() << std::endl;
-
     for (const auto num : program.constants.constants) {
         Constant *constantPointer = constants->addConstant(num);
 
@@ -20,7 +15,7 @@ void AbstractAssembler::prepareConstants(bool verbose) {
 }
 
 InstructionList &AbstractAssembler::assembleConstants() {
-    InstructionList &list = *new InstructionList();
+    InstructionList &list = constants->oneAndMinusOne(primaryAccumulator);
 
     for (const auto &constant : constants->getConstants()) {
         InstructionList &generatedCode = constant->generateConstant(constants, primaryAccumulator, secondaryAccumulator);

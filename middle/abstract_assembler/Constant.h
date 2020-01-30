@@ -4,10 +4,13 @@
 #include <math.h>
 #include <string>
 
+#include <iostream>
+
 #ifndef COMPILER_CONSTANT_H
 #define COMPILER_CONSTANT_H
 
 class ResolvableAddress;
+
 class Constants;
 
 #include "Constants.h"
@@ -21,6 +24,8 @@ private:
     ResolvableAddress &address;
 public:
     long long value;
+    long long generationCost;
+    std::string binaryString;
 
     ResolvableAddress &getAddress();
 
@@ -32,7 +37,11 @@ public:
 
     std::string toString();
 
-    Constant(long long value, ResolvableAddress &address) : value(value), address(address) {}
+    Constant(long long value, ResolvableAddress &address);
+
+    bool operator<(const Constant &c) const {
+        return llabs(value) < llabs(c.value);
+    }
 };
 
 #endif //COMPILER_CONSTANT_H
