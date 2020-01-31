@@ -14,6 +14,8 @@ extern int yyparse();
 
 extern FILE *yyin;
 
+bool warning = false;
+
 int main(int argc, char **argv) {
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
@@ -108,7 +110,13 @@ int main(int argc, char **argv) {
         }
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        std::cout << "[i] Compiled successfully in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms" << std::endl;
+
+        if (warning) {
+            std::cout << "[w] Compiled with warnings in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms" << std::endl;
+
+        } else {
+            std::cout << "[i] Compiled successfully in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms" << std::endl;
+        }
 
     } catch (std::string errorMessage) {
         std::cout << "   [e] " << errorMessage << std::endl;

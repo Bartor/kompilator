@@ -21,6 +21,8 @@ public:
 
     Constant *getConstant(long long value);
 
+    void removeConstant(Constant *constant);
+
     std::vector<Constant *> getConstants() {
         return constants;
     }

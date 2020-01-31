@@ -1,6 +1,7 @@
 #include "AbstractAssembler.h"
 
 std::string TEMPORARY_NAMES = "!TEMP";
+extern bool warning;
 
 void AbstractAssembler::prepareConstants(bool verbose) {
     constants = new Constants(accumulatorNumber);
@@ -52,6 +53,30 @@ void AbstractAssembler::getVariablesFromDeclarations(bool verbose) {
         }
     }
 }
+
+void AbstractAssembler::removeUselessConstants(InstructionList &instructions) {
+    std::vector < Constant * > toRemove;
+
+    for (auto const &constant : constants->getConstants()) {
+        bool found = false;
+        for (auto const &ins : instructions.getInstructions()) {
+            if (auto addrIns = dynamic_cast<InstructionUsingAddress *>(ins)) {
+                if (&addrIns->address == &constant->getAddress()) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            toRemove.push_back(constant);
+        }
+    }
+
+    for (auto const &constant : toRemove) {
+        constants->removeConstant(constant);
+    }
+}
+
 
 SimpleResolution *AbstractAssembler::assembleCommands(CommandList &commandList) {
     InstructionList &instructions = *new InstructionList();
@@ -315,11 +340,6 @@ SimpleResolution *AbstractAssembler::assembleCondition(Condition &condition, Ins
     );
 }
 
-/***
- * Creates instructions which load result of an expression into accumulator
- * @param expression
- * @return
- */
 SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expression) {
     try {
         UnaryExpression &unaryExpression = dynamic_cast<UnaryExpression &>(expression);
@@ -559,30 +579,33 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                     zeroResultBlock.append(new Sub(primaryAccumulator));
 
                     InstructionList &firstWhileBlock = *new InstructionList();
-                    firstWhileBlock.append(new Load(scaledDivisor->getAddress()))
-                            .append(new Sub(dividend->getAddress()));
+                    InstructionList &postLoadFirstWhileBlock = *new InstructionList();
+
+                    firstWhileBlock.append(new Load(scaledDivisor->getAddress()));
+                    postLoadFirstWhileBlock.append(new Sub(dividend->getAddress()));
 
                     InstructionList &doWhileBlock = *new InstructionList();
                     doWhileBlock.append(new Load(remain->getAddress()))
                             .append(new Sub(scaledDivisor->getAddress()));
 
-                    firstWhileBlock.append(new Jpos(doWhileBlock.start()))
+                    postLoadFirstWhileBlock.append(new Jpos(doWhileBlock.start()))
                             .append(new Jzero(doWhileBlock.start()))
-                            .append(new Load(scaledDivisor->getAddress()))
-                            .append(new Shift(constants->getConstant(1)->getAddress()))
-                            .append(new Store(scaledDivisor->getAddress()))
                             .append(new Load(multiple->getAddress()))
                             .append(new Shift(constants->getConstant(1)->getAddress()))
                             .append(new Store(multiple->getAddress()))
-                            .append(new Jump(firstWhileBlock.start()));
+                            .append(new Load(scaledDivisor->getAddress()))
+                            .append(new Shift(constants->getConstant(1)->getAddress()))
+                            .append(new Store(scaledDivisor->getAddress()))
+                            .append(new Jump(postLoadFirstWhileBlock.start()));
+
+                    firstWhileBlock.append(postLoadFirstWhileBlock);
 
                     InstructionList &afterIfBlock = *new InstructionList();
                     afterIfBlock.append(new Load(scaledDivisor->getAddress()))
                             .append(new Shift(constants->getConstant(-1)->getAddress()))
                             .append(new Store(scaledDivisor->getAddress()))
                             .append(new Load(multiple->getAddress()))
-                            .append(new Shift(constants->getConstant(-1)->getAddress()))
-                            .append(new Store(multiple->getAddress()));
+                            .append(new Shift(constants->getConstant(-1)->getAddress()));
 
                     InstructionList &loadResultBlock = *new InstructionList();
                     if (modulo) {
@@ -650,7 +673,8 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
                                 .append(new Jump(zeroResultBlock.end()));
                     }
 
-                    afterIfBlock.append(new Jzero(loadResultBlock.start()));
+                    afterIfBlock.append(new Jzero(loadResultBlock.start()))
+                            .append(new Store(multiple->getAddress()));
                     doWhileBlock.append(new Jneg(afterIfBlock.start()));
 
                     InstructionList &ifBlock = *new InstructionList();
@@ -939,15 +963,11 @@ SimpleResolution *AbstractAssembler::assembleExpression(AbstractExpression &expr
     }
 }
 
-/***
- * Resolves addresses of variables
- * @param identifier
- * @return
- */
 Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier, bool checkInit = true) {
     Variable *var = scopedVariables->resolveVariable(identifier.name);
     if (checkInit && !var->initialized) {
         std::cout << "   [w] Variable " << var->name << " may not have been initialized" << std::endl;
+        warning = true;
     }
     var->initialized = true; // assume it was initialized at this point
 
@@ -972,6 +992,7 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier, bool chec
 
             if ((accId.index < arrayVar->start || accId.index > arrayVar->end) && !arrayVar->warned) {
                 std::cout << "   [w] Trying to access " + arrayVar->toString() + " at index " + std::to_string(accId.index) << "; you won't be warned about this array anymore" << std::endl;
+                warning = true;
                 arrayVar->warned = true;
             }
 
@@ -992,6 +1013,7 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier, bool chec
                 Variable *variable = scopedVariables->resolveVariable(varAccId.accessName); // "b" variable
                 if (!variable->initialized) {
                     std::cout << "   [w] Variable " << variable->name << " may not have been initialized" << std::endl;
+                    warning = true;
                 }
                 variable->initialized = true; // assume it was initialized at this point
 
@@ -1020,9 +1042,6 @@ Resolution *AbstractAssembler::resolve(AbstractIdentifier &identifier, bool chec
     } else throw "Variable resolution error";
 }
 
-/**
- * Resolve address of a value
- */
 Resolution *AbstractAssembler::resolve(AbstractValue &value) {
     try { // NUMBER VALUE - 0
         NumberValue &numberValue = dynamic_cast<NumberValue &>(value);
@@ -1048,6 +1067,7 @@ InstructionList &AbstractAssembler::assemble(bool verbose) {
     getVariablesFromDeclarations(verbose);
     prepareConstants(verbose);
     SimpleResolution *programCodeResolution = assembleCommands(program.commands);
+    removeUselessConstants(programCodeResolution->instructions);
     InstructionList &instructions = assembleConstants();
     instructions.append(programCodeResolution->instructions);
     instructions.seal(true);

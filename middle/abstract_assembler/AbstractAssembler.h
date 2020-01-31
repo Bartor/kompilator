@@ -95,6 +95,12 @@ private:
     InstructionList &assembleConstants();
 
     /**
+     * Remove constants not used in given instructions from Constants.
+     * @param instructions Instructions to search constants use for.
+     */
+    void removeUselessConstants(InstructionList &instructions);
+
+    /**
      * Assembles a list of AST nodes; this function differentiates each
      * command and knows what to do with each.
      * @param commandList AST nodes to be compiled.

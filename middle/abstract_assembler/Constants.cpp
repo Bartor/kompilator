@@ -20,7 +20,7 @@ Constant *Constants::addConstant(long long value) {
     if (constants.size() == 0) {
         constants.push_back(constant);
     } else {
-        for (int i = 0; i < constants.size(); i++) {
+        for (long long i = 0; i < constants.size(); i++) {
             if (llabs(constants[i]->value) > llabs(value)) {
                 constants.insert(constants.begin() + i, constant);
                 break;
@@ -32,6 +32,15 @@ Constant *Constants::addConstant(long long value) {
         }
     }
     return constant;
+}
+
+void Constants::removeConstant(Constant *constant) {
+    for (long long i = 0; i < constants.size(); i++) {
+        if (constants[i] == constant) {
+            constants.erase(constants.begin() + i);
+            break;
+        }
+    }
 }
 
 InstructionList &Constants::oneAndMinusOne(ResolvableAddress &primaryAccumulator) {

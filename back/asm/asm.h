@@ -85,67 +85,63 @@ public:
     virtual std::string toAssemblyCode(bool pretty = false);
 };
 
-class Load : public Instruction {
+class InstructionUsingAddress : public Instruction {
 public:
     ResolvableAddress &address;
 
-    virtual std::string toAssemblyCode(bool pretty = false);
+    virtual ~InstructionUsingAddress() {}
+    virtual std::string toAssemblyCode(bool pretty = false) = 0;
 
-    Load(ResolvableAddress &address) : address(address) {}
+    InstructionUsingAddress(ResolvableAddress &address) : address(address) {}
 };
 
-class Store : public Instruction {
+class Load : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Store(ResolvableAddress &address) : address(address) {}
+    Load(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
-class Loadi : public Instruction {
+class Store : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Loadi(ResolvableAddress &address) : address(address) {}
+    Store(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
-class Storei : public Instruction {
+class Loadi : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Storei(ResolvableAddress &address) : address(address) {}
+    Loadi(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
-class Add : public Instruction {
+class Storei : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Add(ResolvableAddress &address) : address(address) {}
+    Storei(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
-class Sub : public Instruction {
+class Add : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Sub(ResolvableAddress &address) : address(address) {}
+    Add(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
-class Shift : public Instruction {
+class Sub : public InstructionUsingAddress {
 public:
-    ResolvableAddress &address;
-
     virtual std::string toAssemblyCode(bool pretty = false);
 
-    Shift(ResolvableAddress &address) : address(address) {}
+    Sub(ResolvableAddress &address) : InstructionUsingAddress(address) {}
+};
+
+class Shift : public InstructionUsingAddress {
+public:
+    virtual std::string toAssemblyCode(bool pretty = false);
+
+    Shift(ResolvableAddress &address) : InstructionUsingAddress(address) {}
 };
 
 /**
